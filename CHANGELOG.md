@@ -5,6 +5,14 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.9] - 2023-10-25
+
+### Fixed
+- Added missing get_current_user function to security module
+- Fixed ImportError in main.py when importing security functions
+- Implemented proper JWT token validation and user retrieval
+- Fixed application startup error related to missing security functions
+
 ## [0.4.8] - 2023-10-20
 
 ### Fixed
