@@ -5,6 +5,14 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2023-09-30
+
+### Fixed
+- Fixed database connection issues in admin user creation
+- Added explicit SQLite connection for admin user creation
+- Bypassed PostgreSQL connection attempts during installation
+- Improved installation script with direct database path specification
+
 ## [0.4.3] - 2023-09-25
 
 ### Fixed

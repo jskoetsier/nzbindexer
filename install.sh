@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # NZB Indexer Installation Script
-# Version: 0.4.3
+# Version: 0.4.4
 
 set -e
 
@@ -130,21 +130,34 @@ read -p "Enter admin username: " ADMIN_USERNAME
 read -s -p "Enter admin password: " ADMIN_PASSWORD
 echo ""
 
-# Create admin user using async session
+# Create admin user using SQLite directly
 $PYTHON_CMD -c "
 import asyncio
 import sys
+import os
 sys.path.insert(0, '.')
 
-from app.db.session import AsyncSessionLocal
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 from app.db.models.user import User
 from app.core.security import get_password_hash
 import datetime
 
 async def create_admin_user():
-    async with AsyncSessionLocal() as db:
+    # Use SQLite directly
+    db_path = os.path.join(os.getcwd(), 'app.db')
+    db_url = f'sqlite+aiosqlite:///{db_path}'
+    print(f'Using database: {db_url}')
+
+    # Create engine and session
+    engine = create_async_engine(db_url)
+    async_session = sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with async_session() as db:
         # Check if admin user already exists
-        from sqlalchemy import text
+        from sqlalchemy import text, select
         query = text('SELECT COUNT(*) FROM \"user\" WHERE is_admin = true')
         result = await db.execute(query)
         count = result.scalar()
