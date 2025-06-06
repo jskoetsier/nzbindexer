@@ -12,7 +12,6 @@ class Base:
     """
 
     __allow_unmapped__ = True
-    id: Any
     __name__: str
 
     # Generate __tablename__ automatically based on class name
