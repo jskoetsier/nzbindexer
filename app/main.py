@@ -29,7 +29,7 @@ from starlette.middleware.sessions import SessionMiddleware
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Modern Usenet Indexer with FastAPI",
-    version="0.5.0",
+    version="0.5.1",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
@@ -46,8 +46,8 @@ app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 # Include routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Import custom filters
-from app.web.filters import filesizeformat, timeago
+# Import custom filters and context
+from app.web.filters import filesizeformat, get_template_context, timeago
 
 # Templates
 templates = Jinja2Templates(directory="app/web/templates")
@@ -55,6 +55,12 @@ templates = Jinja2Templates(directory="app/web/templates")
 # Register custom filters
 templates.env.filters["timeago"] = timeago
 templates.env.filters["filesizeformat"] = filesizeformat
+
+
+# Register context processor
+@templates.env.context_processor
+def inject_template_context():
+    return get_template_context()
 
 
 # Helper functions for web routes
@@ -557,7 +563,7 @@ async def health_check():
     """
     Health check endpoint
     """
-    return {"status": "ok", "version": "0.5.0"}
+    return {"status": "ok", "version": "0.5.1"}
 
 
 if __name__ == "__main__":

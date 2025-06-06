@@ -3,7 +3,7 @@ Custom template filters for the web interface
 """
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 def timeago(dt: Optional[datetime]) -> str:
@@ -63,3 +63,17 @@ def filesizeformat(size: Optional[int]) -> str:
                 return f"{int(value)} {unit}"
 
     return f"{size} B"
+
+
+def get_current_year() -> str:
+    """
+    Get the current year as a string
+    """
+    return str(datetime.now().year)
+
+
+def get_template_context() -> Dict[str, Any]:
+    """
+    Get common template context variables
+    """
+    return {"current_year": get_current_year()}
