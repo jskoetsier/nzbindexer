@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # NZB Indexer Installation Script
-# Version: 0.5.3
+# Version: 0.5.4
 
 set -e
 

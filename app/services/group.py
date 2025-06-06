@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import List, Optional
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, Dict, List, Optional
 
 from app.db.models.group import Group
 from app.schemas.group import GroupCreate, GroupUpdate
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_group(db: AsyncSession, group_id: int) -> Optional[Group]:
@@ -25,19 +25,41 @@ async def get_group_by_name(db: AsyncSession, name: str) -> Optional[Group]:
 
 
 async def get_groups(
-    db: AsyncSession, skip: int = 0, limit: int = 100, active_only: bool = False
-) -> List[Group]:
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 100,
+    active: Optional[bool] = None,
+    backfill: Optional[bool] = None,
+    search: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Get multiple groups with pagination and optional filtering
     """
     query = select(Group)
 
-    if active_only:
-        query = query.filter(Group.active == True)
+    # Filter by active status if specified
+    if active is not None:
+        query = query.filter(Group.active == active)
 
+    # Filter by backfill status if specified
+    if backfill is not None:
+        query = query.filter(Group.backfill == backfill)
+
+    # Filter by search term if specified
+    if search:
+        query = query.filter(Group.name.ilike(f"%{search}%"))
+
+    # Get total count for pagination
+    count_query = select(func.count()).select_from(query.subquery())
+    count_result = await db.execute(count_query)
+    total = count_result.scalar() or 0
+
+    # Apply pagination
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    items = result.scalars().all()
+
+    return {"items": items, "total": total}
 
 
 async def create_group(db: AsyncSession, group_in: GroupCreate) -> Group:
@@ -106,7 +128,7 @@ async def update_group_article_stats(
     group_id: int,
     first_article_id: Optional[int] = None,
     last_article_id: Optional[int] = None,
-    current_article_id: Optional[int] = None
+    current_article_id: Optional[int] = None,
 ) -> Optional[Group]:
     """
     Update group article statistics
