@@ -29,7 +29,7 @@ from starlette.middleware.sessions import SessionMiddleware
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Modern Usenet Indexer with FastAPI",
-    version="0.5.1",
+    version="0.5.2",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
@@ -57,10 +57,8 @@ templates.env.filters["timeago"] = timeago
 templates.env.filters["filesizeformat"] = filesizeformat
 
 
-# Register context processor
-@templates.env.context_processor
-def inject_template_context():
-    return get_template_context()
+# Add global template variables
+templates.env.globals.update(get_template_context())
 
 
 # Helper functions for web routes
@@ -563,7 +561,7 @@ async def health_check():
     """
     Health check endpoint
     """
-    return {"status": "ok", "version": "0.5.1"}
+    return {"status": "ok", "version": "0.5.2"}
 
 
 if __name__ == "__main__":

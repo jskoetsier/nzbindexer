@@ -5,6 +5,14 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2023-11-10
+
+### Fixed
+- Fixed Jinja2 context processor implementation
+- Replaced decorator-based context processor with direct globals update
+- Fixed "AttributeError: 'Environment' object has no attribute 'context_processor'" error
+- Improved template context handling for global variables
+
 ## [0.5.1] - 2023-11-05
 
 ### Added
