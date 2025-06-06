@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # NZB Indexer Installation Script
-# Version: 0.2.0
+# Version: 0.4.0
 
 set -e
 
@@ -124,36 +124,55 @@ fi
 
 # Create initial admin user if needed
 echo -e "${YELLOW}Checking for admin user...${NC}"
-if $PYTHON_CMD -c "from app.db.session import SessionLocal; from app.db.models.user import User; db = SessionLocal(); print(db.query(User).filter(User.is_admin == True).count() == 0)" | grep -q "True"; then
-    echo -e "${YELLOW}No admin user found. Creating admin user...${NC}"
-    read -p "Enter admin email: " ADMIN_EMAIL
-    read -p "Enter admin username: " ADMIN_USERNAME
-    read -s -p "Enter admin password: " ADMIN_PASSWORD
-    echo ""
+echo -e "${YELLOW}Creating admin user...${NC}"
+read -p "Enter admin email: " ADMIN_EMAIL
+read -p "Enter admin username: " ADMIN_USERNAME
+read -s -p "Enter admin password: " ADMIN_PASSWORD
+echo ""
 
-    $PYTHON_CMD -c "
-from app.db.session import SessionLocal
+# Create admin user using async session
+$PYTHON_CMD -c "
+import asyncio
+import sys
+sys.path.insert(0, '.')
+
+from app.db.session import AsyncSessionLocal
 from app.db.models.user import User
 from app.core.security import get_password_hash
 import datetime
 
-db = SessionLocal()
-admin = User(
-    email='$ADMIN_EMAIL',
-    username='$ADMIN_USERNAME',
-    hashed_password=get_password_hash('$ADMIN_PASSWORD'),
-    is_active=True,
-    is_admin=True,
-    is_confirmed=True,
-    last_login=datetime.datetime.utcnow()
-)
-db.add(admin)
-db.commit()
-db.close()
+async def create_admin_user():
+    async with AsyncSessionLocal() as db:
+        # Check if admin user already exists
+        query = 'SELECT COUNT(*) FROM \"user\" WHERE is_admin = true'
+        result = await db.execute(query)
+        count = result.scalar()
+
+        if count == 0:
+            print('Creating new admin user...')
+            admin = User(
+                email='$ADMIN_EMAIL',
+                username='$ADMIN_USERNAME',
+                hashed_password=get_password_hash('$ADMIN_PASSWORD'),
+                is_active=True,
+                is_admin=True,
+                is_confirmed=True,
+                last_login=datetime.datetime.utcnow()
+            )
+            db.add(admin)
+            await db.commit()
+            print('Admin user created successfully')
+        else:
+            print('Admin user already exists')
+
+asyncio.run(create_admin_user())
 "
-    echo -e "${GREEN}Admin user created.${NC}"
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}Admin user check completed.${NC}"
 else
-    echo -e "${GREEN}Admin user already exists. Skipping creation.${NC}"
+    echo -e "${RED}Failed to create admin user. Please check the error messages above.${NC}"
+    echo -e "${YELLOW}You can create an admin user manually later.${NC}"
 fi
 
 # Create systemd service file
