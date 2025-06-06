@@ -1,5 +1,5 @@
 # NZB Indexer Requirements
-# Version: 0.4.6
+# Version: 0.4.7
 
 # FastAPI and web server
 fastapi>=0.95.0

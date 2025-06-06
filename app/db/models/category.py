@@ -1,6 +1,6 @@
 from app.db.models.base import Base
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 
 
 class Category(Base):
@@ -14,8 +14,11 @@ class Category(Base):
 
     # Category hierarchy
     parent_id = Column(Integer, ForeignKey("category.id"), nullable=True)
+    # Self-referential relationship without using remote_side
     children = relationship(
-        "Category", backref="parent", remote_side=["id"], cascade="all, delete-orphan"
+        "Category",
+        backref=backref("parent"),
+        cascade="all, delete-orphan",
     )
 
     # Category status
