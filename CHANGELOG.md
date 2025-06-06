@@ -5,6 +5,14 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2023-09-15
+
+### Fixed
+- Fixed SQLAlchemy 2.0 compatibility issues with model classes
+- Added `__allow_unmapped__ = True` to Base model class
+- Resolved MappedAnnotationError during admin user creation
+- Fixed database model compatibility with newer SQLAlchemy versions
+
 ## [0.4.0] - 2023-09-10
 
 ### Added

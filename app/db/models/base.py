@@ -10,6 +10,8 @@ class Base:
     """
     Base class for all SQLAlchemy models
     """
+
+    __allow_unmapped__ = True
     id: Any
     __name__: str
 
@@ -22,8 +24,5 @@ class Base:
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
