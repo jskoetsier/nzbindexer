@@ -1,16 +1,18 @@
 from datetime import datetime
 from typing import Optional
 
+from app.db.models.base import Base
+
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import relationship
-
-from app.db.models.base import Base
 
 
 class Group(Base):
     """
     Usenet newsgroup model
     """
+
+    __allow_unmapped__ = True
     name = Column(String(255), unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
 

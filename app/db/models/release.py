@@ -1,19 +1,28 @@
 from datetime import datetime
 from typing import Optional
 
+from app.db.models.base import Base
+
 from sqlalchemy import (
-    Boolean, Column, DateTime, Float, ForeignKey,
-    Integer, String, Text, BigInteger
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
-
-from app.db.models.base import Base
 
 
 class Release(Base):
     """
     Release model representing a complete Usenet release
     """
+
+    __allow_unmapped__ = True
     # Basic release information
     name = Column(String(255), index=True, nullable=False)
     search_name = Column(String(255), index=True, nullable=False)
