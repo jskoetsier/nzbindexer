@@ -5,6 +5,23 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2023-08-25
+
+### Added
+- Improved installation script with better Python 3.12+ support
+- Support for externally managed environments
+- Requirements.txt file for easier dependency management
+
+### Changed
+- Updated dependency management to be more flexible
+- Removed strict version constraints to avoid dependency conflicts
+- Improved error handling in installation process
+
+### Fixed
+- Fixed dependency conflicts between FastAPI and Starlette
+- Resolved "externally-managed-environment" errors in Python 3.12+
+- Added fallback methods for virtual environment creation
+
 ## [0.2.0] - 2023-08-15
 
 ### Added
