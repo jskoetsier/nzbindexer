@@ -12,14 +12,8 @@ class Category(Base):
     name = Column(String(64), unique=True, nullable=False)
     description = Column(Text, nullable=True)
 
-    # Category hierarchy
+    # Category hierarchy - just keep the foreign key, remove the relationships
     parent_id = Column(Integer, ForeignKey("category.id"), nullable=True)
-    # Self-referential relationship without using remote_side
-    children = relationship(
-        "Category",
-        backref=backref("parent"),
-        cascade="all, delete-orphan",
-    )
 
     # Category status
     active = Column(Boolean, default=True, nullable=False)
