@@ -186,6 +186,12 @@ async def register_page(request: Request, db: AsyncSession = Depends(get_db)):
     if user:
         return RedirectResponse(url="/browse", status_code=status.HTTP_303_SEE_OTHER)
 
+    # Check if registration is allowed
+    app_settings = await get_app_settings(db)
+    if not app_settings.allow_registration:
+        flash_message(request, "Registration is currently disabled", "danger")
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     return templates.TemplateResponse(
         "register.html", {"request": request, "messages": get_flash_messages(request)}
     )
@@ -205,6 +211,12 @@ async def register_submit(
     """
     Process registration form
     """
+    # Check if registration is allowed
+    app_settings = await get_app_settings(db)
+    if not app_settings.allow_registration:
+        flash_message(request, "Registration is currently disabled", "danger")
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
     # Check if passwords match
     if password != confirm_password:
         flash_message(request, "Passwords do not match", "danger")

@@ -1,6 +1,6 @@
 """
 Database initialization script for NZB Indexer
-Version: 0.3.0
+Version: 0.5.4
 """
 
 import asyncio
@@ -10,6 +10,7 @@ from typing import Optional
 
 from app.core.config import settings
 from app.db.models.base import Base
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -33,6 +34,64 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
     logger.info("Database tables created successfully!")
+
+    # Initialize settings
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        await init_settings(session)
+
+
+async def init_settings(db: AsyncSession) -> None:
+    """
+    Initialize settings with default values
+    """
+    logger.info("Initializing settings...")
+
+    try:
+        # Check if settings table exists and has data
+        try:
+            query = text("SELECT COUNT(*) FROM setting")
+            result = await db.execute(query)
+            count = result.scalar()
+        except Exception:
+            # Table might not exist yet
+            count = 0
+
+        if count == 0:
+            logger.info("Creating default settings...")
+
+            # Import here to avoid circular imports
+            from app.schemas.setting import AppSettings
+            from app.services.setting import update_app_settings
+
+            # Create default settings
+            default_settings = AppSettings(
+                allow_registration=True,
+                nntp_server=settings.NNTP_SERVER,
+                nntp_port=settings.NNTP_PORT,
+                nntp_ssl=settings.NNTP_SSL,
+                nntp_ssl_port=settings.NNTP_SSL_PORT,
+                nntp_username=settings.NNTP_USERNAME,
+                nntp_password=settings.NNTP_PASSWORD,
+                update_threads=settings.UPDATE_THREADS,
+                releases_threads=settings.RELEASES_THREADS,
+                postprocess_threads=settings.POSTPROCESS_THREADS,
+                backfill_days=settings.BACKFILL_DAYS,
+                retention_days=settings.RETENTION_DAYS,
+            )
+
+            # Save settings to database
+            await update_app_settings(db, default_settings)
+
+            logger.info("Default settings created successfully!")
+        else:
+            logger.info("Settings already exist, skipping initialization.")
+
+    except Exception as e:
+        logger.error(f"Error initializing settings: {str(e)}")
+        # Don't raise the exception, just log it
+        # This allows the database initialization to continue even if settings initialization fails
 
 
 def get_database_url() -> str:

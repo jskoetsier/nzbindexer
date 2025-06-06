@@ -25,12 +25,21 @@ class NNTPService:
     Service for interacting with NNTP servers
     """
 
-    def __init__(self):
-        self.server = settings.NNTP_SERVER
-        self.port = settings.NNTP_SSL_PORT if settings.NNTP_SSL else settings.NNTP_PORT
-        self.use_ssl = settings.NNTP_SSL
-        self.username = settings.NNTP_USERNAME
-        self.password = settings.NNTP_PASSWORD
+    def __init__(
+        self,
+        server: str = None,
+        port: int = None,
+        use_ssl: bool = None,
+        username: str = None,
+        password: str = None,
+    ):
+        self.server = server or settings.NNTP_SERVER
+        self.use_ssl = use_ssl if use_ssl is not None else settings.NNTP_SSL
+        self.port = port or (
+            settings.NNTP_SSL_PORT if self.use_ssl else settings.NNTP_PORT
+        )
+        self.username = username if username is not None else settings.NNTP_USERNAME
+        self.password = password if password is not None else settings.NNTP_PASSWORD
 
     def connect(self) -> nntplib.NNTP:
         """
