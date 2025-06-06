@@ -35,42 +35,63 @@ else
 fi
 
 # Create virtual environment first to avoid externally-managed-environment issues
-echo -e "${YELLOW}Creating virtual environment...${NC}"
-if [ ! -d "venv" ]; then
+echo -e "${YELLOW}Setting up virtual environment...${NC}"
+
+# Check if venv exists and is valid
+if [ -d "venv" ] && [ -f "venv/bin/activate" ]; then
+    echo -e "${GREEN}Valid virtual environment found.${NC}"
+else
+    # Remove any existing invalid venv directory
+    if [ -d "venv" ]; then
+        echo -e "${YELLOW}Found invalid virtual environment. Removing it...${NC}"
+        rm -rf venv
+    fi
+
+    echo -e "${YELLOW}Creating new virtual environment...${NC}"
+
     # Check if venv module is available
     if $PYTHON_CMD -c "import venv" &>/dev/null; then
         echo -e "${GREEN}Using built-in venv module...${NC}"
         $PYTHON_CMD -m venv venv
     else
-        # For Python 3.12+ with externally-managed-environment
-        echo -e "${YELLOW}venv module not available. Checking for externally managed environment...${NC}"
+        echo -e "${YELLOW}venv module not available. Trying alternative methods...${NC}"
 
-        # Create a temporary virtual environment using system Python's ensurepip
-        echo -e "${YELLOW}Creating a temporary environment to bootstrap installation...${NC}"
-        $PYTHON_CMD -m ensurepip --user || true
-
-        # Try to use pipx if available (safer approach)
-        if command -v pipx &>/dev/null; then
-            echo -e "${GREEN}pipx found. Using it to install virtualenv...${NC}"
-            pipx install virtualenv
-            pipx run virtualenv venv
+        # Try to use virtualenv directly if it's installed
+        if command -v virtualenv &>/dev/null; then
+            echo -e "${GREEN}Using system virtualenv...${NC}"
+            virtualenv venv
         else
-            # Try with --break-system-packages flag for Python 3.12+
-            echo -e "${YELLOW}Attempting to install virtualenv with --break-system-packages...${NC}"
-            $PYTHON_CMD -m pip install --user --break-system-packages virtualenv || $PYTHON_CMD -m pip install --user virtualenv
+            # Try to install virtualenv
+            echo -e "${YELLOW}Installing virtualenv...${NC}"
 
-            # Create the virtual environment
-            $PYTHON_CMD -m virtualenv venv
+            # Try with --break-system-packages flag for Python 3.12+
+            $PYTHON_CMD -m pip install --user --break-system-packages virtualenv 2>/dev/null || \
+            $PYTHON_CMD -m pip install --user virtualenv 2>/dev/null || \
+            echo -e "${RED}Failed to install virtualenv. Please install it manually with: pip install --user virtualenv${NC}"
+
+            # Check if virtualenv was installed successfully
+            if $PYTHON_CMD -m virtualenv --version &>/dev/null; then
+                echo -e "${GREEN}Successfully installed virtualenv. Creating environment...${NC}"
+                $PYTHON_CMD -m virtualenv venv
+            else
+                echo -e "${RED}Could not create virtual environment. Please create it manually with: python -m venv venv${NC}"
+                exit 1
+            fi
         fi
     fi
-    echo -e "${GREEN}Virtual environment created.${NC}"
-else
-    echo -e "${YELLOW}Virtual environment already exists. Skipping creation.${NC}"
+
+    # Verify the virtual environment was created successfully
+    if [ ! -f "venv/bin/activate" ]; then
+        echo -e "${RED}Failed to create a valid virtual environment. Please check your Python installation.${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Virtual environment created successfully.${NC}"
 fi
 
 # Activate virtual environment
 echo -e "${YELLOW}Activating virtual environment...${NC}"
-source venv/bin/activate
+source venv/bin/activate || { echo -e "${RED}Failed to activate virtual environment.${NC}"; exit 1; }
 
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
