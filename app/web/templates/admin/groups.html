@@ -29,6 +29,9 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="backfill-tab" data-bs-toggle="tab" data-bs-target="#backfill" type="button" role="tab" aria-controls="backfill" aria-selected="false">Backfill Groups</button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="discover-tab" data-bs-toggle="tab" data-bs-target="#discover" type="button" role="tab" aria-controls="discover" aria-selected="false">Discover Groups</button>
+                    </li>
                 </ul>
             </div>
             <div class="card-body">
@@ -143,6 +146,82 @@
                             </table>
                         </div>
                     </div>
+                    <div class="tab-pane fade" id="discover" role="tabpanel" aria-labelledby="discover-tab">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="card-title mb-0">Discover Newsgroups</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="discover-form">
+                                            <div class="mb-3">
+                                                <label for="pattern" class="form-label">Pattern</label>
+                                                <input type="text" class="form-control" id="pattern" name="pattern" value="*" placeholder="e.g., alt.*, comp.sys.*">
+                                                <div class="form-text">Use wildcards (*) to filter newsgroups. Leave as * to get all groups.</div>
+                                            </div>
+                                            <div class="mb-3 form-check">
+                                                <input type="checkbox" class="form-check-input" id="active" name="active">
+                                                <label class="form-check-label" for="active">Set discovered groups as active</label>
+                                            </div>
+                                            <div class="d-grid">
+                                                <button type="submit" class="btn btn-primary" id="discover-button">
+                                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="discover-spinner"></span>
+                                                    Discover Newsgroups
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="card-title mb-0">Discovery Results</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="discovery-results" class="d-none">
+                                            <h5>Discovery Statistics</h5>
+                                            <table class="table table-sm">
+                                                <tbody>
+                                                    <tr>
+                                                        <th>Total groups found:</th>
+                                                        <td id="result-total">0</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Groups added:</th>
+                                                        <td id="result-added">0</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Groups updated:</th>
+                                                        <td id="result-updated">0</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Groups skipped:</th>
+                                                        <td id="result-skipped">0</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Groups failed:</th>
+                                                        <td id="result-failed">0</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                            <div class="alert alert-success mt-3" id="discovery-success">
+                                                Discovery completed successfully!
+                                            </div>
+                                            <div class="alert alert-danger mt-3 d-none" id="discovery-error">
+                                                Error: <span id="error-message"></span>
+                                            </div>
+                                        </div>
+                                        <div id="discovery-placeholder" class="text-center text-muted py-5">
+                                            <i class="bi bi-search" style="font-size: 3rem;"></i>
+                                            <p class="mt-3">Discovery results will appear here</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -213,6 +292,82 @@
                         console.error('Error updating backfill status:', error);
                     }
                 });
+            });
+        }
+
+        // Handle newsgroup discovery form submission
+        const discoverForm = document.getElementById('discover-form');
+        if (discoverForm) {
+            discoverForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                // Get form data
+                const pattern = document.getElementById('pattern').value || '*';
+                const active = document.getElementById('active').checked;
+
+                // Show spinner and disable button
+                const discoverButton = document.getElementById('discover-button');
+                const discoverSpinner = document.getElementById('discover-spinner');
+                discoverButton.disabled = true;
+                discoverSpinner.classList.remove('d-none');
+
+                // Hide previous results
+                document.getElementById('discovery-results').classList.add('d-none');
+                document.getElementById('discovery-placeholder').classList.remove('d-none');
+                document.getElementById('discovery-error').classList.add('d-none');
+                document.getElementById('discovery-success').classList.remove('d-none');
+
+                try {
+                    const response = await fetch('/api/v1/groups/discover', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            pattern: pattern,
+                            active: active
+                        })
+                    });
+
+                    // Hide placeholder
+                    document.getElementById('discovery-placeholder').classList.add('d-none');
+
+                    if (response.ok) {
+                        const data = await response.json();
+
+                        // Update results
+                        document.getElementById('result-total').textContent = data.total;
+                        document.getElementById('result-added').textContent = data.added;
+                        document.getElementById('result-updated').textContent = data.updated;
+                        document.getElementById('result-skipped').textContent = data.skipped;
+                        document.getElementById('result-failed').textContent = data.failed;
+
+                        // Show results
+                        document.getElementById('discovery-results').classList.remove('d-none');
+
+                        // If groups were added, refresh the page after a delay
+                        if (data.added > 0 || data.updated > 0) {
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 3000);
+                        }
+                    } else {
+                        const errorData = await response.json();
+                        document.getElementById('error-message').textContent = errorData.detail || 'Unknown error';
+                        document.getElementById('discovery-error').classList.remove('d-none');
+                        document.getElementById('discovery-success').classList.add('d-none');
+                        document.getElementById('discovery-results').classList.remove('d-none');
+                    }
+                } catch (error) {
+                    document.getElementById('error-message').textContent = error.message || 'Network error';
+                    document.getElementById('discovery-error').classList.remove('d-none');
+                    document.getElementById('discovery-success').classList.add('d-none');
+                    document.getElementById('discovery-results').classList.remove('d-none');
+                } finally {
+                    // Hide spinner and enable button
+                    discoverButton.disabled = false;
+                    discoverSpinner.classList.add('d-none');
+                }
             });
         }
     });
