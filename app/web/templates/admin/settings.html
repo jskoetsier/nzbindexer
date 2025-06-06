@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Settings - NZB Indexer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>Application Settings</h1>
+        <p class="lead">Configure application settings</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col">
+        <div class="card shadow admin-panel">
+            <div class="card-header bg-dark text-white">
+                <ul class="nav nav-pills card-header-pills" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">General</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="nntp-tab" data-bs-toggle="tab" data-bs-target="#nntp" type="button" role="tab" aria-controls="nntp" aria-selected="false">NNTP Server</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="indexer-tab" data-bs-toggle="tab" data-bs-target="#indexer" type="button" role="tab" aria-controls="indexer" aria-selected="false">Indexer</button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/admin/settings">
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
+                            <h4 class="mb-3">General Settings</h4>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="allow_registration" name="allow_registration" {% if settings.allow_registration %}checked{% endif %}>
+                                <label class="form-check-label" for="allow_registration">Allow new user registration</label>
+                                <div class="form-text">If unchecked, only administrators can create new users.</div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="nntp" role="tabpanel" aria-labelledby="nntp-tab">
+                            <h4 class="mb-3">NNTP Server Settings</h4>
+
+                            <div class="mb-3">
+                                <label for="nntp_server" class="form-label">NNTP Server</label>
+                                <input type="text" class="form-control" id="nntp_server" name="nntp_server" value="{{ settings.nntp_server }}">
+                                <div class="form-text">Hostname or IP address of the NNTP server.</div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="nntp_port" class="form-label">NNTP Port</label>
+                                    <input type="number" class="form-control" id="nntp_port" name="nntp_port" value="{{ settings.nntp_port }}">
+                                    <div class="form-text">Default is 119.</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="nntp_ssl_port" class="form-label">NNTP SSL Port</label>
+                                    <input type="number" class="form-control" id="nntp_ssl_port" name="nntp_ssl_port" value="{{ settings.nntp_ssl_port }}">
+                                    <div class="form-text">Default is 563.</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="nntp_ssl" name="nntp_ssl" {% if settings.nntp_ssl %}checked{% endif %}>
+                                <label class="form-check-label" for="nntp_ssl">Use SSL</label>
+                                <div class="form-text">Enable SSL for secure connection to the NNTP server.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="nntp_username" class="form-label">NNTP Username</label>
+                                <input type="text" class="form-control" id="nntp_username" name="nntp_username" value="{{ settings.nntp_username }}">
+                                <div class="form-text">Leave blank if authentication is not required.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="nntp_password" class="form-label">NNTP Password</label>
+                                <input type="password" class="form-control" id="nntp_password" name="nntp_password" value="{{ settings.nntp_password }}">
+                                <div class="form-text">Leave blank if authentication is not required or to keep existing password.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-info" id="test-nntp-connection">
+                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="test-spinner"></span>
+                                    Test Connection
+                                </button>
+                                <span class="ms-2" id="test-result"></span>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="indexer" role="tabpanel" aria-labelledby="indexer-tab">
+                            <h4 class="mb-3">Indexer Settings</h4>
+
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="update_threads" class="form-label">Update Threads</label>
+                                    <input type="number" class="form-control" id="update_threads" name="update_threads" value="{{ settings.update_threads }}" min="1" max="10">
+                                    <div class="form-text">Number of threads for updating groups.</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="releases_threads" class="form-label">Releases Threads</label>
+                                    <input type="number" class="form-control" id="releases_threads" name="releases_threads" value="{{ settings.releases_threads }}" min="1" max="10">
+                                    <div class="form-text">Number of threads for processing releases.</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="postprocess_threads" class="form-label">Postprocess Threads</label>
+                                    <input type="number" class="form-control" id="postprocess_threads" name="postprocess_threads" value="{{ settings.postprocess_threads }}" min="1" max="10">
+                                    <div class="form-text">Number of threads for post-processing.</div>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="backfill_days" class="form-label">Backfill Days</label>
+                                    <input type="number" class="form-control" id="backfill_days" name="backfill_days" value="{{ settings.backfill_days }}" min="1" max="1000">
+                                    <div class="form-text">Number of days to backfill.</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="retention_days" class="form-label">Retention Days</label>
+                                    <input type="number" class="form-control" id="retention_days" name="retention_days" value="{{ settings.retention_days }}" min="1" max="3000">
+                                    <div class="form-text">Number of days to retain articles.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Test NNTP connection
+        const testButton = document.getElementById('test-nntp-connection');
+        if (testButton) {
+            testButton.addEventListener('click', async function() {
+                const server = document.getElementById('nntp_server').value;
+                const port = document.getElementById('nntp_port').value;
+                const sslPort = document.getElementById('nntp_ssl_port').value;
+                const ssl = document.getElementById('nntp_ssl').checked;
+                const username = document.getElementById('nntp_username').value;
+                const password = document.getElementById('nntp_password').value;
+
+                if (!server) {
+                    document.getElementById('test-result').innerHTML = '<span class="text-danger">Server is required</span>';
+                    return;
+                }
+
+                // Show spinner
+                const spinner = document.getElementById('test-spinner');
+                spinner.classList.remove('d-none');
+                testButton.disabled = true;
+                document.getElementById('test-result').innerHTML = '';
+
+                try {
+                    const response = await fetch('/api/v1/nntp/test-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            server: server,
+                            port: parseInt(port),
+                            ssl_port: parseInt(sslPort),
+                            ssl: ssl,
+                            username: username,
+                            password: password
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        document.getElementById('test-result').innerHTML = '<span class="text-success">Connection successful!</span>';
+                    } else {
+                        document.getElementById('test-result').innerHTML = `<span class="text-danger">Connection failed: ${data.detail}</span>`;
+                    }
+                } catch (error) {
+                    document.getElementById('test-result').innerHTML = `<span class="text-danger">Error: ${error.message}</span>`;
+                } finally {
+                    // Hide spinner
+                    spinner.classList.add('d-none');
+                    testButton.disabled = false;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

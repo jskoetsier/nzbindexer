@@ -5,11 +5,13 @@ from app.api.v1.api import api_router
 
 from app.core.config import settings
 from app.core.security import create_access_token, get_current_user
+from app.core.tasks import start_background_tasks, stop_background_tasks
 from app.db.models.group import Group
 from app.db.models.user import User
 from app.db.session import get_db
 from app.schemas.group import GroupCreate, GroupUpdate
-from app.schemas.user import UserCreate
+from app.schemas.setting import AppSettings
+from app.schemas.user import UserCreate, UserUpdate
 from app.services.group import (
     create_group,
     delete_group,
@@ -17,7 +19,8 @@ from app.services.group import (
     get_groups,
     update_group,
 )
-from app.services.user import create_user, get_user_by_email
+from app.services.setting import get_app_settings, update_app_settings
+from app.services.user import create_user, get_user, get_user_by_email, update_user
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -131,7 +134,7 @@ async def login_page(request: Request, db: AsyncSession = Depends(get_db)):
 @app.post("/login", response_class=HTMLResponse)
 async def login_submit(
     request: Request,
-    email: str = Form(...),
+    login: str = Form(...),
     password: str = Form(...),
     remember: bool = Form(False),
     db: AsyncSession = Depends(get_db),
@@ -140,10 +143,17 @@ async def login_submit(
     Process login form
     """
     from app.core.security import verify_password
+    from app.services.user import get_user_by_username
 
-    user = await get_user_by_email(db, email=email)
+    # Try to find user by email first
+    user = await get_user_by_email(db, email=login)
+
+    # If not found by email, try by username
+    if not user:
+        user = await get_user_by_username(db, username=login)
+
     if not user or not verify_password(password, user.hashed_password):
-        flash_message(request, "Invalid email or password", "danger")
+        flash_message(request, "Invalid username/email or password", "danger")
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     if not user.is_active:
@@ -556,12 +566,175 @@ async def admin_delete_group(
     return RedirectResponse(url="/admin/groups", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@app.get("/admin/settings", response_class=HTMLResponse)
+async def admin_settings(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(admin_required),
+):
+    """
+    Admin settings page
+    """
+    # Get application settings
+    settings = await get_app_settings(db)
+
+    return templates.TemplateResponse(
+        "admin/settings.html",
+        {
+            "request": request,
+            "user": user,
+            "settings": settings,
+            "messages": get_flash_messages(request),
+        },
+    )
+
+
+@app.post("/admin/settings", response_class=HTMLResponse)
+async def admin_update_settings(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(admin_required),
+):
+    """
+    Admin update settings
+    """
+    # Get form data
+    form_data = await request.form()
+
+    # Create AppSettings object
+    app_settings = AppSettings(
+        allow_registration=form_data.get("allow_registration") == "on",
+        nntp_server=form_data.get("nntp_server", ""),
+        nntp_port=int(form_data.get("nntp_port", 119)),
+        nntp_ssl=form_data.get("nntp_ssl") == "on",
+        nntp_ssl_port=int(form_data.get("nntp_ssl_port", 563)),
+        nntp_username=form_data.get("nntp_username", ""),
+        nntp_password=form_data.get("nntp_password", ""),
+        update_threads=int(form_data.get("update_threads", 1)),
+        releases_threads=int(form_data.get("releases_threads", 1)),
+        postprocess_threads=int(form_data.get("postprocess_threads", 1)),
+        backfill_days=int(form_data.get("backfill_days", 3)),
+        retention_days=int(form_data.get("retention_days", 1100)),
+    )
+
+    # Update settings
+    try:
+        await update_app_settings(db, app_settings)
+        flash_message(request, "Settings updated successfully", "success")
+    except Exception as e:
+        flash_message(request, f"Error updating settings: {str(e)}", "danger")
+
+    return RedirectResponse(
+        url="/admin/settings", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    User profile page
+    """
+    user = await get_current_web_user(request, db)
+    if not user:
+        flash_message(request, "Please login to access this page", "danger")
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    return templates.TemplateResponse(
+        "profile.html",
+        {
+            "request": request,
+            "user": user,
+            "messages": get_flash_messages(request),
+        },
+    )
+
+
+@app.post("/profile", response_class=HTMLResponse)
+async def profile_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update user profile
+    """
+    user = await get_current_web_user(request, db)
+    if not user:
+        flash_message(request, "Please login to access this page", "danger")
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Get form data
+    form_data = await request.form()
+
+    # Create UserUpdate object
+    user_update = UserUpdate(
+        first_name=form_data.get("first_name"),
+        last_name=form_data.get("last_name"),
+        email=form_data.get("email"),
+    )
+
+    # Update password if provided
+    current_password = form_data.get("current_password")
+    new_password = form_data.get("new_password")
+    confirm_password = form_data.get("confirm_password")
+
+    if current_password and new_password and confirm_password:
+        from app.core.security import verify_password
+
+        # Check if current password is correct
+        if not verify_password(current_password, user.hashed_password):
+            flash_message(request, "Current password is incorrect", "danger")
+            return RedirectResponse(
+                url="/profile", status_code=status.HTTP_303_SEE_OTHER
+            )
+
+        # Check if new passwords match
+        if new_password != confirm_password:
+            flash_message(request, "New passwords do not match", "danger")
+            return RedirectResponse(
+                url="/profile", status_code=status.HTTP_303_SEE_OTHER
+            )
+
+        # Update password
+        user_update.password = new_password
+
+    # Update user
+    try:
+        await update_user(db, user.id, user_update)
+        flash_message(request, "Profile updated successfully", "success")
+    except Exception as e:
+        flash_message(request, f"Error updating profile: {str(e)}", "danger")
+
+    return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @app.get("/health")
 async def health_check():
     """
     Health check endpoint
     """
     return {"status": "ok", "version": "0.5.4"}
+
+
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """
+    Startup event handler
+    """
+    # Start background tasks
+    start_background_tasks()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Shutdown event handler
+    """
+    # Stop background tasks
+    stop_background_tasks()
 
 
 if __name__ == "__main__":
