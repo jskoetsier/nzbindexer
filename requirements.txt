@@ -4,7 +4,7 @@
 # FastAPI and web server
 fastapi>=0.95.0,<0.96.0
 uvicorn>=0.21.1,<0.22.0
-starlette>=0.26.1,<0.27.0
+starlette>=0.27.0,<0.28.0
 jinja2>=3.1.2,<3.2.0
 python-multipart>=0.0.6,<0.1.0
 itsdangerous>=2.1.2,<2.2.0  # For session middleware
