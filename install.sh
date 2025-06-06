@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # NZB Indexer Installation Script
-# Version: 0.4.2
+# Version: 0.4.3
 
 set -e
 
@@ -144,7 +144,8 @@ import datetime
 async def create_admin_user():
     async with AsyncSessionLocal() as db:
         # Check if admin user already exists
-        query = 'SELECT COUNT(*) FROM \"user\" WHERE is_admin = true'
+        from sqlalchemy import text
+        query = text('SELECT COUNT(*) FROM \"user\" WHERE is_admin = true')
         result = await db.execute(query)
         count = result.scalar()
 

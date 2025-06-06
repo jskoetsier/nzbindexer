@@ -5,6 +5,14 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2023-09-25
+
+### Fixed
+- Fixed SQLAlchemy raw SQL query execution in admin user creation
+- Added proper text() wrapper for raw SQL queries
+- Resolved ArgumentError with textual SQL expressions
+- Updated installation script to handle SQLAlchemy 2.0 SQL execution
+
 ## [0.4.2] - 2023-09-20
 
 ### Fixed
