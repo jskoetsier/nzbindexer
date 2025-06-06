@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Groups Management - NZB Indexer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>Groups Management</h1>
+        <p class="lead">Manage Usenet newsgroups</p>
+    </div>
+    <div class="col-auto d-flex align-items-center">
+        <a href="/admin/groups/new" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Add New Group
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col">
+        <div class="card shadow admin-panel">
+            <div class="card-header bg-dark text-white">
+                <ul class="nav nav-pills card-header-pills" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active" type="button" role="tab" aria-controls="active" aria-selected="true">Active Groups</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="inactive-tab" data-bs-toggle="tab" data-bs-target="#inactive" type="button" role="tab" aria-controls="inactive" aria-selected="false">Inactive Groups</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="backfill-tab" data-bs-toggle="tab" data-bs-target="#backfill" type="button" role="tab" aria-controls="backfill" aria-selected="false">Backfill Groups</button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="active" role="tabpanel" aria-labelledby="active-tab">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Last Updated</th>
+                                        <th>Articles</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for group in active_groups %}
+                                    <tr>
+                                        <td>{{ group.name }}</td>
+                                        <td>{{ group.description|truncate(50) if group.description else "No description" }}</td>
+                                        <td>{{ group.last_updated.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>{{ group.last_article_id - group.first_article_id }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="/admin/groups/{{ group.id }}" class="btn btn-outline-primary">Edit</a>
+                                                <button class="btn btn-danger toggle-group-status" data-group-id="{{ group.id }}" data-status="true">Deactivate</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">No active groups found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="inactive" role="tabpanel" aria-labelledby="inactive-tab">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Last Updated</th>
+                                        <th>Articles</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for group in inactive_groups %}
+                                    <tr>
+                                        <td>{{ group.name }}</td>
+                                        <td>{{ group.description|truncate(50) if group.description else "No description" }}</td>
+                                        <td>{{ group.last_updated.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>{{ group.last_article_id - group.first_article_id }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="/admin/groups/{{ group.id }}" class="btn btn-outline-primary">Edit</a>
+                                                <button class="btn btn-success toggle-group-status" data-group-id="{{ group.id }}" data-status="false">Activate</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">No inactive groups found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="backfill" role="tabpanel" aria-labelledby="backfill-tab">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Backfill Target</th>
+                                        <th>Current Progress</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for group in backfill_groups %}
+                                    <tr>
+                                        <td>{{ group.name }}</td>
+                                        <td>{{ group.description|truncate(50) if group.description else "No description" }}</td>
+                                        <td>{{ group.backfill_target }}</td>
+                                        <td>
+                                            <div class="progress">
+                                                {% set progress = ((group.current_article_id - group.first_article_id) / (group.backfill_target - group.first_article_id) * 100)|int if group.backfill_target > group.first_article_id else 0 %}
+                                                <div class="progress-bar" role="progressbar" data-width="{{ progress }}" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100">{{ progress }}%</div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="/admin/groups/{{ group.id }}" class="btn btn-outline-primary">Edit</a>
+                                                <button class="btn btn-warning toggle-backfill-status" data-group-id="{{ group.id }}" data-status="true">Stop Backfill</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">No backfill groups found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set progress bar widths
+        const progressBars = document.querySelectorAll('.progress-bar[data-width]');
+        if (progressBars) {
+            progressBars.forEach(function(progressBar) {
+                const width = progressBar.getAttribute('data-width');
+                progressBar.style.width = width + '%';
+            });
+        }
+
+        // Toggle backfill status
+        const backfillToggleButtons = document.querySelectorAll('.toggle-backfill-status');
+        if (backfillToggleButtons) {
+            backfillToggleButtons.forEach(function(button) {
+                button.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    const groupId = this.dataset.groupId;
+                    const currentStatus = this.dataset.status === 'true';
+
+                    try {
+                        const response = await fetch(`/api/v1/groups/${groupId}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                backfill: !currentStatus
+                            })
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            // Update button state
+                            this.dataset.status = data.backfill.toString();
+
+                            // Update button text and class
+                            if (data.backfill) {
+                                this.textContent = 'Stop Backfill';
+                                this.classList.remove('btn-success');
+                                this.classList.add('btn-warning');
+                            } else {
+                                this.textContent = 'Start Backfill';
+                                this.classList.remove('btn-warning');
+                                this.classList.add('btn-success');
+                            }
+
+                            // Refresh the page to update the tabs
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            console.error('Failed to update backfill status');
+                        }
+                    } catch (error) {
+                        console.error('Error updating backfill status:', error);
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

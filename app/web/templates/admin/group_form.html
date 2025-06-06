@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Edit" if group else "New" }} Group - Admin - NZB Indexer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>{{ "Edit" if group else "New" }} Group</h1>
+        <p class="lead">{{ "Edit existing" if group else "Create new" }} Usenet newsgroup</p>
+    </div>
+    <div class="col-auto d-flex align-items-center">
+        <a href="/admin/groups" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Groups
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Group Details</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ '/admin/groups/' + group.id|string if group else '/admin/groups/new' }}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Group Name</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ group.name if group else '' }}" required>
+                        <div class="form-text">The full name of the Usenet newsgroup (e.g., alt.binaries.example)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ group.description if group and group.description else '' }}</textarea>
+                        <div class="form-text">Optional description of the group's content</div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="active" name="active" {% if not group or group.active %}checked{% endif %}>
+                                <label class="form-check-label" for="active">Active</label>
+                            </div>
+                            <div class="form-text">Enable or disable indexing for this group</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="backfill" name="backfill" {% if group and group.backfill %}checked{% endif %}>
+                                <label class="form-check-label" for="backfill">Backfill</label>
+                            </div>
+                            <div class="form-text">Enable backfilling of older articles</div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5>Processing Settings</h5>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="min_files" class="form-label">Minimum Files</label>
+                            <input type="number" class="form-control" id="min_files" name="min_files" value="{{ group.min_files if group else 1 }}" min="1" required>
+                            <div class="form-text">Minimum number of files required for a valid release</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="min_size" class="form-label">Minimum Size (bytes)</label>
+                            <input type="number" class="form-control" id="min_size" name="min_size" value="{{ group.min_size if group else 0 }}" min="0" required>
+                            <div class="form-text">Minimum size in bytes required for a valid release</div>
+                        </div>
+                    </div>
+
+                    {% if group %}
+                    <hr>
+                    <h5>Backfill Settings</h5>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="backfill_target" class="form-label">Backfill Target Article ID</label>
+                            <input type="number" class="form-control" id="backfill_target" name="backfill_target" value="{{ group.backfill_target if group else 0 }}" min="0">
+                            <div class="form-text">Target article ID for backfilling (0 = no backfill)</div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5>Group Statistics</h5>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="first_article_id" class="form-label">First Article ID</label>
+                            <input type="number" class="form-control" id="first_article_id" name="first_article_id" value="{{ group.first_article_id if group else 0 }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="last_article_id" class="form-label">Last Article ID</label>
+                            <input type="number" class="form-control" id="last_article_id" name="last_article_id" value="{{ group.last_article_id if group else 0 }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="current_article_id" class="form-label">Current Article ID</label>
+                            <input type="number" class="form-control" id="current_article_id" name="current_article_id" value="{{ group.current_article_id if group else 0 }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="last_updated" class="form-label">Last Updated</label>
+                            <input type="text" class="form-control" id="last_updated" value="{{ group.last_updated.strftime('%Y-%m-%d %H:%M:%S') if group else '' }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="last_article_date" class="form-label">Last Article Date</label>
+                            <input type="text" class="form-control" id="last_article_date" value="{{ group.last_article_date.strftime('%Y-%m-%d %H:%M:%S') if group and group.last_article_date else '' }}" readonly>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mt-4">
+                        {% if group %}
+                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteGroupModal">
+                            Delete Group
+                        </button>
+                        {% else %}
+                        <div></div>
+                        {% endif %}
+                        <div>
+                            <a href="/admin/groups" class="btn btn-outline-secondary me-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Save Group</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Group Information</h4>
+            </div>
+            <div class="card-body">
+                <p>Groups are Usenet newsgroups that the indexer monitors for new content. Each group can be configured with specific settings for processing and backfilling.</p>
+
+                <h5 class="mt-4">Settings Explained</h5>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex">
+                        <span class="fw-bold me-2">Active:</span>
+                        <span>When enabled, the indexer will process new articles from this group.</span>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <span class="fw-bold me-2">Backfill:</span>
+                        <span>When enabled, the indexer will attempt to process older articles up to the backfill target.</span>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <span class="fw-bold me-2">Minimum Files:</span>
+                        <span>Sets the minimum number of files required for a valid release.</span>
+                    </li>
+                    <li class="list-group-item d-flex">
+                        <span class="fw-bold me-2">Minimum Size:</span>
+                        <span>Sets the minimum size in bytes required for a valid release.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if group %}
+<!-- Delete Group Modal -->
+<div class="modal fade" id="deleteGroupModal" tabindex="-1" aria-labelledby="deleteGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteGroupModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the group <strong>{{ group.name }}</strong>?</p>
+                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone. All associated data will be permanently deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="/admin/groups/{{ group.id }}/delete">
+                    <button type="submit" class="btn btn-danger">Delete Group</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+{% endblock %}

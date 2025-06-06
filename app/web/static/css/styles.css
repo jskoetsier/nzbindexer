@@ -1,0 +1,85 @@
+/* Main styles for NZB Indexer */
+
+/* General styles */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.footer {
+    margin-top: auto;
+}
+
+/* Card styles */
+.card {
+    transition: transform 0.2s;
+    margin-bottom: 1rem;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Group list styles */
+.group-list .group-item {
+    border-left: 4px solid #007bff;
+    background-color: #f8f9fa;
+    margin-bottom: 0.5rem;
+    padding: 1rem;
+    border-radius: 0.25rem;
+}
+
+.group-list .group-item.inactive {
+    border-left-color: #6c757d;
+    opacity: 0.7;
+}
+
+/* Admin panel styles */
+.admin-panel .nav-pills .nav-link.active {
+    background-color: #343a40;
+}
+
+.admin-panel .tab-content {
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0 0.25rem 0.25rem 0.25rem;
+}
+
+/* Form styles */
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-columns {
+        column-count: 1;
+    }
+
+    .admin-panel .nav-pills {
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        white-space: nowrap;
+        margin-bottom: 1rem;
+    }
+
+    .admin-panel .nav-pills .nav-link {
+        flex: 0 0 auto;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 992px) {
+    .card-columns {
+        column-count: 2;
+    }
+}
+
+@media (min-width: 993px) {
+    .card-columns {
+        column-count: 3;
+    }
+}

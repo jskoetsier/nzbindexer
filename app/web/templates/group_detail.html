@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group.name }} - NZB Indexer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>{{ group.name }}</h1>
+        {% if group.description %}
+            <p class="lead">{{ group.description }}</p>
+        {% endif %}
+    </div>
+    <div class="col-auto d-flex align-items-center">
+        <a href="/groups" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Groups
+        </a>
+        {% if user and user.is_admin %}
+            <a href="/admin/groups/{{ group.id }}" class="btn btn-primary">
+                <i class="bi bi-gear"></i> Edit Group
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Group Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Status:</span>
+                        <span class="badge bg-{{ 'success' if group.active else 'secondary' }}">
+                            {{ 'Active' if group.active else 'Inactive' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Backfill:</span>
+                        <span class="badge bg-{{ 'info' if group.backfill else 'secondary' }}">
+                            {{ 'Enabled' if group.backfill else 'Disabled' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Minimum Files:</span>
+                        <span>{{ group.min_files }}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Minimum Size:</span>
+                        <span>{{ group.min_size|filesizeformat }}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Last Updated:</span>
+                        <span>{{ group.last_updated.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                </div>
+                {% if group.last_article_date %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Last Article:</span>
+                        <span>{{ group.last_article_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Article Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">First Article ID:</span>
+                        <span>{{ group.first_article_id }}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Last Article ID:</span>
+                        <span>{{ group.last_article_id }}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Current Article ID:</span>
+                        <span>{{ group.current_article_id }}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Total Articles:</span>
+                        <span>{{ group.last_article_id - group.first_article_id }}</span>
+                    </div>
+                </div>
+                {% if group.backfill and group.backfill_target > 0 %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Backfill Target:</span>
+                        <span>{{ group.backfill_target }}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="backfillProgress" class="form-label">Backfill Progress</label>
+                    {% set progress = ((group.current_article_id - group.first_article_id) / (group.backfill_target - group.first_article_id) * 100)|int if group.backfill_target > group.first_article_id else 0 %}
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" data-width="{{ progress }}" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100">{{ progress }}%</div>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const progressBar = document.querySelector('.progress-bar[data-width]');
+                            if (progressBar) {
+                                const width = progressBar.getAttribute('data-width');
+                                progressBar.style.width = width + '%';
+                            }
+                        });
+                    </script>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Recent Releases</h5>
+            </div>
+            <div class="card-body">
+                {% if releases %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Size</th>
+                                    <th>Age</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for release in releases %}
+                                <tr>
+                                    <td>{{ release.name }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ release.category.name if release.category else "Uncategorized" }}</span>
+                                    </td>
+                                    <td>{{ release.size|filesizeformat }}</td>
+                                    <td>{{ release.created_at|timeago }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="/releases/{{ release.id }}" class="btn btn-outline-primary">Details</a>
+                                            <a href="/releases/{{ release.id }}/download" class="btn btn-success">Download NZB</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if more_releases %}
+                        <div class="text-center mt-3">
+                            <a href="/browse?group={{ group.id }}" class="btn btn-outline-primary">View All Releases</a>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-info">
+                        No releases found for this group.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+{% endblock %}
