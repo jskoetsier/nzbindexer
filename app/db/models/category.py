@@ -15,7 +15,7 @@ class Category(Base):
     # Category hierarchy
     parent_id = Column(Integer, ForeignKey("category.id"), nullable=True)
     children = relationship(
-        "Category", backref="parent", remote_side=[id], cascade="all, delete-orphan"
+        "Category", backref="parent", remote_side=["id"], cascade="all, delete-orphan"
     )
 
     # Category status
