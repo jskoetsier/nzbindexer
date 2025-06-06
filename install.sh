@@ -34,30 +34,35 @@ else
     exit 1
 fi
 
-# Check if pip is installed
-echo -e "${YELLOW}Checking pip installation...${NC}"
-if ! command -v pip3 &>/dev/null; then
-    echo -e "${RED}pip3 not found. Installing pip...${NC}"
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-    $PYTHON_CMD get-pip.py
-    rm get-pip.py
-else
-    echo -e "${GREEN}pip3 found. Continuing...${NC}"
-fi
-
-# Check if virtualenv is installed
-echo -e "${YELLOW}Checking virtualenv installation...${NC}"
-if ! $PYTHON_CMD -m pip show virtualenv &>/dev/null; then
-    echo -e "${YELLOW}virtualenv not found. Installing virtualenv...${NC}"
-    $PYTHON_CMD -m pip install virtualenv
-else
-    echo -e "${GREEN}virtualenv found. Continuing...${NC}"
-fi
-
-# Create virtual environment
+# Create virtual environment first to avoid externally-managed-environment issues
 echo -e "${YELLOW}Creating virtual environment...${NC}"
 if [ ! -d "venv" ]; then
-    $PYTHON_CMD -m virtualenv venv
+    # Check if venv module is available
+    if $PYTHON_CMD -c "import venv" &>/dev/null; then
+        echo -e "${GREEN}Using built-in venv module...${NC}"
+        $PYTHON_CMD -m venv venv
+    else
+        # For Python 3.12+ with externally-managed-environment
+        echo -e "${YELLOW}venv module not available. Checking for externally managed environment...${NC}"
+
+        # Create a temporary virtual environment using system Python's ensurepip
+        echo -e "${YELLOW}Creating a temporary environment to bootstrap installation...${NC}"
+        $PYTHON_CMD -m ensurepip --user || true
+
+        # Try to use pipx if available (safer approach)
+        if command -v pipx &>/dev/null; then
+            echo -e "${GREEN}pipx found. Using it to install virtualenv...${NC}"
+            pipx install virtualenv
+            pipx run virtualenv venv
+        else
+            # Try with --break-system-packages flag for Python 3.12+
+            echo -e "${YELLOW}Attempting to install virtualenv with --break-system-packages...${NC}"
+            $PYTHON_CMD -m pip install --user --break-system-packages virtualenv || $PYTHON_CMD -m pip install --user virtualenv
+
+            # Create the virtual environment
+            $PYTHON_CMD -m virtualenv venv
+        fi
+    fi
     echo -e "${GREEN}Virtual environment created.${NC}"
 else
     echo -e "${YELLOW}Virtual environment already exists. Skipping creation.${NC}"
