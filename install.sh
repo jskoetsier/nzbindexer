@@ -101,8 +101,23 @@ pip install -r requirements.txt
 echo -e "${YELLOW}Checking database...${NC}"
 if [ ! -f "app.db" ]; then
     echo -e "${YELLOW}Database not found. Initializing database...${NC}"
-    $PYTHON_CMD -m app.db.init_db
-    echo -e "${GREEN}Database initialized.${NC}"
+
+    # Run the database initialization script
+    cd "$(dirname "$0")"  # Ensure we're in the project root directory
+    python -c "
+import asyncio
+import sys
+sys.path.insert(0, '.')  # Add current directory to path
+from app.db.init_db import main
+asyncio.run(main())
+"
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Database initialized successfully.${NC}"
+    else
+        echo -e "${RED}Failed to initialize database. Please check the error messages above.${NC}"
+        exit 1
+    fi
 else
     echo -e "${GREEN}Database found. Skipping initialization.${NC}"
 fi
