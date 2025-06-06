@@ -1,13 +1,15 @@
+import os
 from typing import AsyncGenerator
+
+from app.core.config import settings
+from app.db.init_db import get_database_url
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import settings
-
 # Create async engine
 engine = create_async_engine(
-    str(settings.SQLALCHEMY_DATABASE_URI),
+    get_database_url(),
     echo=False,
     future=True,
     pool_pre_ping=True,

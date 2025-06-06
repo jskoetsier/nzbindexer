@@ -29,7 +29,7 @@ from starlette.middleware.sessions import SessionMiddleware
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Modern Usenet Indexer with FastAPI",
-    version="0.5.2",
+    version="0.5.3",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
@@ -561,7 +561,7 @@ async def health_check():
     """
     Health check endpoint
     """
-    return {"status": "ok", "version": "0.5.2"}
+    return {"status": "ok", "version": "0.5.3"}
 
 
 if __name__ == "__main__":

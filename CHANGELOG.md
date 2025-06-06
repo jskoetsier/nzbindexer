@@ -5,6 +5,14 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2023-11-15
+
+### Fixed
+- Fixed database connection issues in main application
+- Updated session.py to use the same database URL logic as init_db.py
+- Resolved PostgreSQL connection errors during login
+- Ensured consistent database usage throughout the application
+
 ## [0.5.2] - 2023-11-10
 
 ### Fixed
