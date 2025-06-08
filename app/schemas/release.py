@@ -141,9 +141,9 @@ class ReleaseWithCategory(Release):
     Schema for Release with Category information
     """
 
-    from app.schemas.category import Category
+    from app.schemas.category import CategoryResponse
 
-    category: Category
+    category: CategoryResponse
 
 
 class ReleaseWithGroup(Release):
@@ -151,9 +151,9 @@ class ReleaseWithGroup(Release):
     Schema for Release with Group information
     """
 
-    from app.schemas.group import Group
+    from app.schemas.group import GroupResponse
 
-    group: Group
+    group: GroupResponse
 
 
 class ReleaseWithDetails(ReleaseWithCategory, ReleaseWithGroup):

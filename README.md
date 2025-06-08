@@ -10,6 +10,10 @@ A modern Usenet indexer built with FastAPI, featuring a responsive web interface
 - **Admin Panel**: Configure groups, manage users, and monitor system status
 - **API Access**: Complete RESTful API with OpenAPI documentation
 - **Backfill Support**: Track and manage article backfilling
+- **Article Processing**: Convert Usenet articles into releases
+- **Release Management**: Extract metadata and categorize releases
+- **NZB Generation**: Create NZB files for downloads
+- **Search Functionality**: Find releases by name, category, and more
 
 ## Screenshots
 

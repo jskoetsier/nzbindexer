@@ -5,6 +5,19 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2023-12-01
+
+### Added
+- Article processing functionality for converting Usenet articles into releases
+- Release management with metadata extraction and categorization
+- NZB file generation for downloads
+- Release detail page with comprehensive information display
+- Search functionality for finding releases
+- API endpoints for managing and downloading releases
+- Binary post detection and grouping
+- Automatic metadata extraction from release names
+- Release categorization based on content analysis
+
 ## [0.5.4] - 2023-11-20
 
 ### Fixed

@@ -77,7 +77,7 @@ async def search_releases_endpoint(
     return releases
 
 
-@router.post("/", response_model=ReleaseResponse)
+@router.post("/", response_model=Release)
 async def create_new_release(
     release_in: ReleaseCreate,
     db: AsyncSession = Depends(get_db),
