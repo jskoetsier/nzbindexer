@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}{{ release.name }} - NZB Indexer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/browse">Browse</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Release Details</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Release Details</h5>
+                <div>
+                    <a href="/releases/{{ release.id }}/download" class="btn btn-success btn-sm">
+                        <i class="bi bi-download me-1"></i> Download NZB
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <h4>{{ release.name }}</h4>
+
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <th scope="row" class="text-muted">Category</th>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ release.category.name if release.category else "Uncategorized" }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted">Group</th>
+                                    <td>{{ release.group.name if release.group else "Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted">Size</th>
+                                    <td>{{ release.size|filesizeformat }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted">Files</th>
+                                    <td>{{ release.files }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted">Posted</th>
+                                    <td>{{ release.posted_date|timeago if release.posted_date else "Unknown" }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted">Added</th>
+                                    <td>{{ release.added_date|timeago }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row" class="text-muted">Completion</th>
+                                    <td>
+                                        <div class="progress" style="height: 5px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ release.completion }}%;" aria-valuenow="{{ release.completion }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                        <small class="text-muted">{{ release.completion }}%</small>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tbody>
+                                {% if release.year %}
+                                <tr>
+                                    <th scope="row" class="text-muted">Year</th>
+                                    <td>{{ release.year }}</td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.resolution %}
+                                <tr>
+                                    <th scope="row" class="text-muted">Resolution</th>
+                                    <td>{{ release.resolution }}</td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.video_codec %}
+                                <tr>
+                                    <th scope="row" class="text-muted">Video</th>
+                                    <td>{{ release.video_codec }}</td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.audio_codec %}
+                                <tr>
+                                    <th scope="row" class="text-muted">Audio</th>
+                                    <td>{{ release.audio_codec }}</td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.season and release.episode %}
+                                <tr>
+                                    <th scope="row" class="text-muted">Episode</th>
+                                    <td>S{{ release.season }}E{{ release.episode }}</td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.artist %}
+                                <tr>
+                                    <th scope="row" class="text-muted">Artist</th>
+                                    <td>{{ release.artist }}</td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.album %}
+                                <tr>
+                                    <th scope="row" class="text-muted">Album</th>
+                                    <td>{{ release.album }}</td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.imdb_id %}
+                                <tr>
+                                    <th scope="row" class="text-muted">IMDB</th>
+                                    <td>
+                                        <a href="https://www.imdb.com/title/{{ release.imdb_id }}/" target="_blank" rel="noopener noreferrer">
+                                            {{ release.imdb_id }}
+                                            <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endif %}
+
+                                {% if release.tvdb_id %}
+                                <tr>
+                                    <th scope="row" class="text-muted">TVDB</th>
+                                    <td>
+                                        <a href="https://thetvdb.com/?id={{ release.tvdb_id }}&tab=series" target="_blank" rel="noopener noreferrer">
+                                            {{ release.tvdb_id }}
+                                            <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {% if release.description %}
+                <div class="mt-4">
+                    <h5>Description</h5>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <pre class="mb-0">{{ release.description }}</pre>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted">Downloads: {{ release.grabs }}</span>
+                    </div>
+                    <div>
+                        <a href="/releases/{{ release.id }}/download" class="btn btn-success">
+                            <i class="bi bi-download me-1"></i> Download NZB
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        {% if release.cover %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-0">
+                <img src="{{ release.cover }}" alt="{{ release.cover_title or release.name }}" class="img-fluid rounded">
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Similar Releases</h5>
+            </div>
+            <div class="card-body">
+                <!-- TODO: Implement similar releases -->
+                <p class="text-muted">No similar releases found.</p>
+            </div>
+        </div>
+
+        {% if user and user.is_admin %}
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Admin Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/api/v1/releases/{{ release.id }}/process" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-gear me-1"></i> Process Release
+                    </a>
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteReleaseModal">
+                        <i class="bi bi-trash me-1"></i> Delete Release
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Release Modal -->
+        <div class="modal fade" id="deleteReleaseModal" tabindex="-1" aria-labelledby="deleteReleaseModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deleteReleaseModalLabel">Confirm Delete</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        Are you sure you want to delete this release? This action cannot be undone.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <form action="/api/v1/releases/{{ release.id }}" method="POST" id="deleteReleaseForm">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css" />
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle delete form submission
+        const deleteForm = document.getElementById('deleteReleaseForm');
+        if (deleteForm) {
+            deleteForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                fetch('/api/v1/releases/{{ release.id }}', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/browse';
+                    } else {
+                        alert('Failed to delete release');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while deleting the release');
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

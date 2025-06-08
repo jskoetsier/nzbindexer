@@ -75,9 +75,9 @@ async def update_group(group_id: int) -> None:
 
                 logger.info(f"Updated group {group.name}: {group_info}")
 
-                # TODO: Process new articles
-                # This would involve fetching articles between current_article_id and last_article_id
-                # and processing them into releases
+                # Process new articles
+                from app.services.article import process_group_update
+                await process_group_update(db, group)
 
             except Exception as e:
                 logger.error(f"Error updating group {group.name}: {str(e)}")
@@ -146,9 +146,9 @@ async def backfill_group(group_id: int) -> None:
                     f"Backfilling group {group.name} to target {group.backfill_target}"
                 )
 
-                # TODO: Process backfill articles
-                # This would involve fetching articles between backfill_target and current_article_id
-                # and processing them into releases
+                # Process backfill articles
+                from app.services.article import process_group_backfill
+                await process_group_backfill(db, group)
 
             except Exception as e:
                 logger.error(f"Error backfilling group {group.name}: {str(e)}")

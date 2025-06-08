@@ -105,14 +105,170 @@ async def root():
 
 
 @app.get("/browse", response_class=HTMLResponse)
-async def browse(request: Request, db: AsyncSession = Depends(get_db)):
+async def browse(
+    request: Request,
+    search: Optional[str] = None,
+    category_id: Optional[int] = None,
+    group_id: Optional[int] = None,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Browse page
     """
     user = await get_current_web_user(request, db)
+
+    # Get releases with pagination
+    per_page = 20
+    skip = (page - 1) * per_page
+
+    # Import release service
+    from app.services.release import get_releases
+
+    # Get releases
+    releases_data = await get_releases(
+        db,
+        skip=skip,
+        limit=per_page,
+        search=search,
+        category_id=category_id,
+        group_id=group_id,
+        sort_by="added_date",
+        sort_desc=True,
+    )
+
+    # Get categories for filtering
+    from app.db.models.category import Category
+    from sqlalchemy import select
+
+    query = (
+        select(Category).filter(Category.active == True).order_by(Category.sort_order)
+    )
+    result = await db.execute(query)
+    categories = result.scalars().all()
+
+    # Create pagination object
+    total = releases_data["total"]
+    releases = releases_data["items"]
+
+    pagination = {
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "pages": (total + per_page - 1) // per_page,
+        "has_prev": page > 1,
+        "has_next": page < ((total + per_page - 1) // per_page),
+        "prev_url": (
+            f"/browse?page={page-1}&search={search}"
+            if search and page > 1
+            else f"/browse?page={page-1}" if page > 1 else None
+        ),
+        "next_url": (
+            f"/browse?page={page+1}&search={search}"
+            if search and page < ((total + per_page - 1) // per_page)
+            else (
+                f"/browse?page={page+1}"
+                if page < ((total + per_page - 1) // per_page)
+                else None
+            )
+        ),
+        "iter_pages": lambda: range(1, ((total + per_page - 1) // per_page) + 1),
+        "url_for_page": lambda p: (
+            f"/browse?page={p}&search={search}" if search else f"/browse?page={p}"
+        ),
+    }
+
+    # Get user downloads if user is logged in
+    user_downloads = []
+    if user:
+        # TODO: Implement user downloads
+        pass
+
     return templates.TemplateResponse(
         "browse.html",
-        {"request": request, "user": user, "messages": get_flash_messages(request)},
+        {
+            "request": request,
+            "user": user,
+            "releases": releases,
+            "categories": categories,
+            "search": search,
+            "category_id": category_id,
+            "group_id": group_id,
+            "pagination": pagination,
+            "user_downloads": user_downloads,
+            "messages": get_flash_messages(request),
+        },
+    )
+
+
+@app.get("/releases/{release_id}", response_class=HTMLResponse)
+async def release_detail(
+    request: Request, release_id: int, db: AsyncSession = Depends(get_db)
+):
+    """
+    Release detail page
+    """
+    user = await get_current_web_user(request, db)
+
+    # Get release
+    from app.services.release import get_release
+
+    release = await get_release(db, release_id)
+
+    if not release:
+        flash_message(request, "Release not found", "danger")
+        return RedirectResponse(url="/browse", status_code=status.HTTP_303_SEE_OTHER)
+
+    return templates.TemplateResponse(
+        "release_detail.html",
+        {
+            "request": request,
+            "user": user,
+            "release": release,
+            "messages": get_flash_messages(request),
+        },
+    )
+
+
+@app.get("/releases/{release_id}/download")
+async def download_release(
+    request: Request, release_id: int, db: AsyncSession = Depends(get_db)
+):
+    """
+    Download NZB file for a release
+    """
+    user = await get_current_web_user(request, db)
+
+    if not user:
+        flash_message(request, "Please login to download NZB files", "danger")
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Get release
+    from app.services.release import get_release
+
+    release = await get_release(db, release_id)
+
+    if not release:
+        flash_message(request, "Release not found", "danger")
+        return RedirectResponse(url="/browse", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Get NZB file
+    from app.services.nzb import get_nzb_for_release
+
+    nzb_path = await get_nzb_for_release(db, release_id)
+
+    if not nzb_path:
+        flash_message(request, "NZB file not found", "danger")
+        return RedirectResponse(url="/browse", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Increment grab count
+    # TODO: Implement increment_grab_count
+    # await increment_grab_count(db, release_id, user.id)
+
+    # Return NZB file
+    filename = f"{release.name.replace(' ', '_')}.nzb"
+    return FileResponse(
+        path=nzb_path, filename=filename, media_type="application/x-nzb"
     )
 
 
