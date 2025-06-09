@@ -5,6 +5,24 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2023-12-15
+
+### Added
+- NZB obfuscation for improved privacy and compatibility with Usenet providers
+- Category IDs for Sonarr/Radarr compatibility (Newznab standard)
+- Batch processing for group discovery with progress tracking
+- Job cancellation capability for long-running discovery tasks
+- Improved pagination in admin group management interface
+- Tab state preservation in paginated views
+
+### Fixed
+- Fixed backfill functionality to properly handle edge cases
+- Improved NNTP connection handling with better error recovery
+- Fixed string/bytes handling for different NNTP server responses
+- Added proper database migration script for category IDs
+- Fixed article processing to handle different NNTP response formats
+- Resolved issues with dictionary access in templates
+
 ## [0.6.0] - 2023-12-01
 
 ### Added

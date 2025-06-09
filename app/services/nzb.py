@@ -5,6 +5,8 @@ NZB service for generating and managing NZB files
 import hashlib
 import logging
 import os
+import random
+import string
 import time
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
@@ -96,9 +98,27 @@ class NZBService:
         """
         return os.path.join(self.nzb_dir, f"{nzb_guid}.nzb")
 
+    def _generate_random_string(self, length: int = 10) -> str:
+        """
+        Generate a random string of specified length
+        """
+        chars = string.ascii_letters + string.digits
+        return ''.join(random.choice(chars) for _ in range(length))
+
+    def _obfuscate_subject(self, subject: str) -> Tuple[str, str]:
+        """
+        Obfuscate a subject line
+        Returns a tuple of (obfuscated_subject, original_subject)
+        """
+        # Generate a random string for the obfuscated subject
+        obfuscated = self._generate_random_string(20)
+
+        # Return both the obfuscated subject and the original
+        return obfuscated, subject
+
     async def _create_placeholder_nzb(self, release: Release, nzb_path: str) -> None:
         """
-        Create a placeholder NZB file for a release
+        Create a placeholder NZB file for a release with obfuscation
         This is a temporary solution until we implement actual NZB generation
         """
         # Create root element
@@ -117,11 +137,22 @@ class NZBService:
         meta_size = ET.SubElement(head, "meta", type="size")
         meta_size.text = str(release.size)
 
-        # Add file element
+        # Add obfuscation metadata
+        meta_obfuscated = ET.SubElement(head, "meta", type="obfuscated")
+        meta_obfuscated.text = "yes"
+
+        # Obfuscate the subject
+        obfuscated_subject, original_subject = self._obfuscate_subject(release.name)
+
+        # Store the original subject in metadata (encrypted or encoded in a real implementation)
+        meta_original_subject = ET.SubElement(head, "meta", type="originalSubject")
+        meta_original_subject.text = original_subject
+
+        # Add file element with obfuscated subject
         file_elem = ET.SubElement(
             root, "file", poster="nzbindexer@example.com", date=str(int(time.time()))
         )
-        file_elem.set("subject", release.name)
+        file_elem.set("subject", obfuscated_subject)
 
         # Add groups
         groups = ET.SubElement(file_elem, "groups")
@@ -131,7 +162,7 @@ class NZBService:
         from app.db.models.group import Group
 
         query = select(Group).filter(Group.id == release.group_id)
-        result = await self.db.execute(query)
+        result = await db.execute(query)
         group_obj = result.scalars().first()
 
         if group_obj:
@@ -142,11 +173,11 @@ class NZBService:
         # Add segments
         segments = ET.SubElement(file_elem, "segments")
 
-        # Add a placeholder segment
+        # Add a placeholder segment with obfuscated message ID
         segment = ET.SubElement(
             segments, "segment", bytes=str(release.size), number="1"
         )
-        segment.text = f"<{release.guid}@placeholder.nzb>"
+        segment.text = f"<{self._generate_random_string(30)}@placeholder.nzb>"
 
         # Create XML string
         xml_str = ET.tostring(root, encoding="utf-8")

@@ -42,7 +42,7 @@ from starlette.middleware.sessions import SessionMiddleware
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Modern Usenet Indexer with FastAPI",
-    version="0.6.0",
+    version="0.7.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
@@ -578,6 +578,11 @@ async def admin_groups(
     active_page: int = 1,
     inactive_page: int = 1,
     backfill_page: int = 1,
+    active_search: Optional[str] = None,
+    inactive_search: Optional[str] = None,
+    backfill_search: Optional[str] = None,
+    discover_pattern: Optional[str] = None,
+    tab: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(admin_required),
 ):
@@ -587,10 +592,10 @@ async def admin_groups(
     # Set pagination parameters
     per_page = 10
 
-    # Get active groups with pagination
+    # Get active groups with pagination and search
     active_skip = (active_page - 1) * per_page
     active_groups_data = await get_groups(
-        db, skip=active_skip, limit=per_page, active=True
+        db, skip=active_skip, limit=per_page, active=True, search=active_search
     )
 
     # Create pagination object for active groups
@@ -601,10 +606,10 @@ async def admin_groups(
         "pages": (active_groups_data["total"] + per_page - 1) // per_page,
     }
 
-    # Get inactive groups with pagination
+    # Get inactive groups with pagination and search
     inactive_skip = (inactive_page - 1) * per_page
     inactive_groups_data = await get_groups(
-        db, skip=inactive_skip, limit=per_page, active=False
+        db, skip=inactive_skip, limit=per_page, active=False, search=inactive_search
     )
 
     # Create pagination object for inactive groups
@@ -615,10 +620,10 @@ async def admin_groups(
         "pages": (inactive_groups_data["total"] + per_page - 1) // per_page,
     }
 
-    # Get backfill groups with pagination
+    # Get backfill groups with pagination and search
     backfill_skip = (backfill_page - 1) * per_page
     backfill_groups_data = await get_groups(
-        db, skip=backfill_skip, limit=per_page, backfill=True
+        db, skip=backfill_skip, limit=per_page, backfill=True, search=backfill_search
     )
 
     # Create pagination object for backfill groups
@@ -643,6 +648,11 @@ async def admin_groups(
             "active_page": active_page,
             "inactive_page": inactive_page,
             "backfill_page": backfill_page,
+            "active_search": active_search,
+            "inactive_search": inactive_search,
+            "backfill_search": backfill_search,
+            "discover_pattern": discover_pattern if discover_pattern else "*",
+            "tab": tab,
             "discovery_running": discovery_running,
             "messages": get_flash_messages(request),
         },
@@ -1107,7 +1117,7 @@ async def health_check():
     """
     Health check endpoint
     """
-    return {"status": "ok", "version": "0.6.0"}
+    return {"status": "ok", "version": "0.7.0"}
 
 
 # Startup and shutdown events

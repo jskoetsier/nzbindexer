@@ -12,8 +12,11 @@ A modern Usenet indexer built with FastAPI, featuring a responsive web interface
 - **Backfill Support**: Track and manage article backfilling
 - **Article Processing**: Convert Usenet articles into releases
 - **Release Management**: Extract metadata and categorize releases
-- **NZB Generation**: Create NZB files for downloads
+- **NZB Generation**: Create NZB files for downloads with obfuscation
 - **Search Functionality**: Find releases by name, category, and more
+- **Sonarr/Radarr Integration**: Compatible with automation tools via Newznab API
+- **Batch Processing**: Efficient group discovery with progress tracking
+- **Job Control**: Cancel long-running tasks when needed
 
 ## Screenshots
 

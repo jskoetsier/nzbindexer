@@ -18,12 +18,18 @@
     <div class="col-md-8">
         <div class="card shadow-sm">
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Release Details</h5>vvbkinbtkgtldgjcncfhuuecutgvutclncjjeeebutlg
-                
+                <h5 class="mb-0">Release Details</h5>
+
                 <div>
+                    {% if user %}
                     <a href="/releases/{{ release.id }}/download" class="btn btn-success btn-sm">
                         <i class="bi bi-download me-1"></i> Download NZB
                     </a>
+                    {% else %}
+                    <a href="/login" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Login to Download
+                    </a>
+                    {% endif %}
                 </div>
             </div>
             <div class="card-body">
@@ -168,9 +174,15 @@
                         <span class="text-muted">Downloads: {{ release.grabs }}</span>
                     </div>
                     <div>
+                        {% if user %}
                         <a href="/releases/{{ release.id }}/download" class="btn btn-success">
                             <i class="bi bi-download me-1"></i> Download NZB
                         </a>
+                        {% else %}
+                        <a href="/login" class="btn btn-outline-primary">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Login to Download
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

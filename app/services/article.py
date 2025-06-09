@@ -82,8 +82,37 @@ class ArticleService:
                 batch_end = min(current_id + batch_size - 1, end_id)
 
                 try:
-                    # Get article headers for the batch
-                    resp, articles = conn.over((current_id, batch_end))
+                    # Try to get article headers for the batch using OVER command
+                    try:
+                        resp, articles = conn.over((current_id, batch_end))
+                    except Exception as e:
+                        # If OVER command fails, try using HEAD command for each article
+                        logger.warning(f"OVER command failed: {str(e)}. Falling back to HEAD command.")
+                        articles = []
+                        for article_id in range(current_id, batch_end + 1):
+                            try:
+                                # Get article headers using HEAD command
+                                resp, article_info = conn.head(f"<{article_id}>")
+
+                                # Extract basic info from headers
+                                article_num = article_id
+                                subject = None
+                                message_id = None
+
+                                # Parse headers
+                                for line in article_info.lines:
+                                    line_str = line.decode() if isinstance(line, bytes) else line
+                                    if line_str.startswith("Subject:"):
+                                        subject = line_str[8:].strip()
+                                    elif line_str.startswith("Message-ID:"):
+                                        message_id = line_str[10:].strip()
+
+                                if subject and message_id:
+                                    articles.append((article_num, subject, None, None, message_id, None, 0, 0, {}))
+                            except Exception as article_e:
+                                # Skip articles that can't be retrieved
+                                logger.debug(f"Skipping article {article_id}: {str(article_e)}")
+                                continue
 
                     # Process each article
                     for article in articles:
@@ -484,13 +513,43 @@ async def process_group_backfill(
     start_id = group.backfill_target
     end_id = group.current_article_id - 1
 
-    # If backfill_target is greater than current_article_id, swap them
+    # If backfill_target is greater than current_article_id, we need to fix this
     if start_id >= end_id:
         logger.warning(f"Backfill target {start_id} is greater than or equal to current article ID {end_id} for group {group.name}")
-        # Process a small batch of articles before the backfill target
-        end_id = start_id
-        start_id = max(1, start_id - limit)
-        logger.info(f"Adjusted backfill range to {start_id}-{end_id} for group {group.name}")
+
+        # Get the actual first and last article IDs from the server
+        try:
+            conn = nntp_service.connect()
+            resp, count, first, last, name = conn.group(group.name)
+            conn.quit()
+
+            logger.info(f"Group {group.name} has article range {first}-{last} on server")
+
+            # Update the group's article IDs in the database
+            group.first_article_id = first
+            group.last_article_id = last
+            group.current_article_id = last  # Set current to last to start from the most recent
+
+            # Set backfill target to a reasonable value (e.g., 1000 articles back from last)
+            backfill_amount = min(1000, (last - first) // 2)
+            group.backfill_target = max(first, last - backfill_amount)
+
+            db.add(group)
+            await db.commit()
+
+            # Update our local variables
+            start_id = group.backfill_target
+            end_id = group.current_article_id - 1
+
+            logger.info(f"Updated group article IDs: first={first}, last={last}, current={group.current_article_id}, backfill_target={group.backfill_target}")
+            logger.info(f"New backfill range: {start_id}-{end_id}")
+
+        except Exception as e:
+            logger.error(f"Error updating group article IDs: {str(e)}")
+            # Fallback to the old behavior
+            end_id = start_id
+            start_id = max(1, start_id - limit)
+            logger.info(f"Adjusted backfill range to {start_id}-{end_id} for group {group.name}")
 
     # Process articles from backfill_target to current_article_id
     stats = await article_service.process_articles(

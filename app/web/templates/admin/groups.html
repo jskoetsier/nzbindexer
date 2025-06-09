@@ -37,6 +37,17 @@
             <div class="card-body">
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="active" role="tabpanel" aria-labelledby="active-tab">
+                        <!-- Search form for active groups -->
+                        <form action="/admin/groups" method="get" class="mb-3">
+                            <input type="hidden" name="tab" value="active">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="active_search" placeholder="Search groups..." value="{{ active_search if active_search else '' }}">
+                                <button class="btn btn-outline-primary" type="submit">Search</button>
+                                {% if active_search %}
+                                <a href="/admin/groups?tab=active" class="btn btn-outline-secondary">Clear</a>
+                                {% endif %}
+                            </div>
+                        </form>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -75,23 +86,23 @@
                             <nav aria-label="Active groups pagination">
                                 <ul class="pagination justify-content-center">
                                     <li class="page-item {% if active_page == 1 %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page=1&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">First</a>
+                                        <a class="page-link" href="/admin/groups?active_page=1&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active{% if active_search %}&active_search={{ active_search }}{% endif %}">First</a>
                                     </li>
                                     <li class="page-item {% if active_page == 1 %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page - 1 }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">Previous</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page - 1 }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active{% if active_search %}&active_search={{ active_search }}{% endif %}">Previous</a>
                                     </li>
 
                                     {% for p in range(max(1, active_page - 2), min(active_groups["pages"] + 1, active_page + 3)) %}
                                     <li class="page-item {% if p == active_page %}active{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ p }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">{{ p }}</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ p }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active{% if active_search %}&active_search={{ active_search }}{% endif %}">{{ p }}</a>
                                     </li>
                                     {% endfor %}
 
                                     <li class="page-item {% if active_page == active_groups["pages"] %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page + 1 }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">Next</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page + 1 }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active{% if active_search %}&active_search={{ active_search }}{% endif %}">Next</a>
                                     </li>
                                     <li class="page-item {% if active_page == active_groups["pages"] %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_groups["pages"] }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">Last</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_groups["pages"] }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active{% if active_search %}&active_search={{ active_search }}{% endif %}">Last</a>
                                     </li>
                                 </ul>
                             </nav>
@@ -99,6 +110,17 @@
                         </div>
                     </div>
                     <div class="tab-pane fade" id="inactive" role="tabpanel" aria-labelledby="inactive-tab">
+                        <!-- Search form for inactive groups -->
+                        <form action="/admin/groups" method="get" class="mb-3">
+                            <input type="hidden" name="tab" value="inactive">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="inactive_search" placeholder="Search inactive groups..." value="{{ inactive_search if inactive_search else '' }}">
+                                <button class="btn btn-outline-primary" type="submit">Search</button>
+                                {% if inactive_search %}
+                                <a href="/admin/groups?tab=inactive" class="btn btn-outline-secondary">Clear</a>
+                                {% endif %}
+                            </div>
+                        </form>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -137,23 +159,23 @@
                             <nav aria-label="Inactive groups pagination">
                                 <ul class="pagination justify-content-center">
                                     <li class="page-item {% if inactive_page == 1 %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page=1&backfill_page={{ backfill_page }}&tab=inactive">First</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page=1&backfill_page={{ backfill_page }}&tab=inactive{% if inactive_search %}&inactive_search={{ inactive_search }}{% endif %}">First</a>
                                     </li>
                                     <li class="page-item {% if inactive_page == 1 %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page - 1 }}&backfill_page={{ backfill_page }}&tab=inactive">Previous</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page - 1 }}&backfill_page={{ backfill_page }}&tab=inactive{% if inactive_search %}&inactive_search={{ inactive_search }}{% endif %}">Previous</a>
                                     </li>
 
                                     {% for p in range(max(1, inactive_page - 2), min(inactive_groups["pages"] + 1, inactive_page + 3)) %}
                                     <li class="page-item {% if p == inactive_page %}active{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ p }}&backfill_page={{ backfill_page }}&tab=inactive">{{ p }}</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ p }}&backfill_page={{ backfill_page }}&tab=inactive{% if inactive_search %}&inactive_search={{ inactive_search }}{% endif %}">{{ p }}</a>
                                     </li>
                                     {% endfor %}
 
                                     <li class="page-item {% if inactive_page == inactive_groups["pages"] %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page + 1 }}&backfill_page={{ backfill_page }}&tab=inactive">Next</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page + 1 }}&backfill_page={{ backfill_page }}&tab=inactive{% if inactive_search %}&inactive_search={{ inactive_search }}{% endif %}">Next</a>
                                     </li>
                                     <li class="page-item {% if inactive_page == inactive_groups["pages"] %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_groups["pages"] }}&backfill_page={{ backfill_page }}&tab=inactive">Last</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_groups["pages"] }}&backfill_page={{ backfill_page }}&tab=inactive{% if inactive_search %}&inactive_search={{ inactive_search }}{% endif %}">Last</a>
                                     </li>
                                 </ul>
                             </nav>
@@ -161,6 +183,17 @@
                         </div>
                     </div>
                     <div class="tab-pane fade" id="backfill" role="tabpanel" aria-labelledby="backfill-tab">
+                        <!-- Search form for backfill groups -->
+                        <form action="/admin/groups" method="get" class="mb-3">
+                            <input type="hidden" name="tab" value="backfill">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="backfill_search" placeholder="Search backfill groups..." value="{{ backfill_search if backfill_search else '' }}">
+                                <button class="btn btn-outline-primary" type="submit">Search</button>
+                                {% if backfill_search %}
+                                <a href="/admin/groups?tab=backfill" class="btn btn-outline-secondary">Clear</a>
+                                {% endif %}
+                            </div>
+                        </form>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -204,23 +237,23 @@
                             <nav aria-label="Backfill groups pagination">
                                 <ul class="pagination justify-content-center">
                                     <li class="page-item {% if backfill_page == 1 %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page=1&tab=backfill">First</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page=1&tab=backfill{% if backfill_search %}&backfill_search={{ backfill_search }}{% endif %}">First</a>
                                     </li>
                                     <li class="page-item {% if backfill_page == 1 %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page - 1 }}&tab=backfill">Previous</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page - 1 }}&tab=backfill{% if backfill_search %}&backfill_search={{ backfill_search }}{% endif %}">Previous</a>
                                     </li>
 
                                     {% for p in range(max(1, backfill_page - 2), min(backfill_groups["pages"] + 1, backfill_page + 3)) %}
                                     <li class="page-item {% if p == backfill_page %}active{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ p }}&tab=backfill">{{ p }}</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ p }}&tab=backfill{% if backfill_search %}&backfill_search={{ backfill_search }}{% endif %}">{{ p }}</a>
                                     </li>
                                     {% endfor %}
 
                                     <li class="page-item {% if backfill_page == backfill_groups["pages"] %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page + 1 }}&tab=backfill">Next</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page + 1 }}&tab=backfill{% if backfill_search %}&backfill_search={{ backfill_search }}{% endif %}">Next</a>
                                     </li>
                                     <li class="page-item {% if backfill_page == backfill_groups["pages"] %}disabled{% endif %}">
-                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_groups["pages"] }}&tab=backfill">Last</a>
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_groups["pages"] }}&tab=backfill{% if backfill_search %}&backfill_search={{ backfill_search }}{% endif %}">Last</a>
                                     </li>
                                 </ul>
                             </nav>
@@ -228,6 +261,17 @@
                         </div>
                     </div>
                     <div class="tab-pane fade" id="discover" role="tabpanel" aria-labelledby="discover-tab">
+                        <!-- Search form for discover pattern -->
+                        <form action="/admin/groups" method="get" class="mb-3">
+                            <input type="hidden" name="tab" value="discover">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="discover_pattern" placeholder="Filter pattern (e.g., alt.*, comp.sys.*)" value="{{ discover_pattern if discover_pattern else '*' }}">
+                                <button class="btn btn-outline-primary" type="submit">Filter</button>
+                                {% if discover_pattern and discover_pattern != '*' %}
+                                <a href="/admin/groups?tab=discover" class="btn btn-outline-secondary">Clear</a>
+                                {% endif %}
+                            </div>
+                        </form>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="card">
