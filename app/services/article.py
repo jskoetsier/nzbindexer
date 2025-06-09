@@ -407,7 +407,15 @@ class ArticleService:
 
                     release = await create_release(db, release_data)
 
-                    # TODO: Create NZB file for the release
+                    # Generate NZB file for the release
+                    from app.services.nzb import NZBService
+                    nzb_service = NZBService(nntp_service=self.nntp_service)
+                    nzb_path = await nzb_service.generate_nzb(db, release.id)
+
+                    if nzb_path:
+                        logger.info(f"Generated NZB file for release {release.id}: {nzb_path}")
+                    else:
+                        logger.warning(f"Failed to generate NZB file for release {release.id}")
 
                     releases_created += 1
 

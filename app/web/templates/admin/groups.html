@@ -213,7 +213,10 @@
                                         <td>{{ group.backfill_target }}</td>
                                         <td>
                                             <div class="progress">
-                                                {% set progress = ((group.current_article_id - group.first_article_id) / (group.backfill_target - group.first_article_id) * 100)|int if group.backfill_target > group.first_article_id else 0 %}
+                                                {% set backfill_range = group.backfill_target - group.first_article_id %}
+                                                {% set current_progress = group.current_article_id - group.first_article_id %}
+                                                {% set progress = (current_progress / backfill_range * 100)|int if backfill_range > 0 else 0 %}
+                                                {% set progress = min(100, progress) %}
                                                 <div class="progress-bar" role="progressbar" data-width="{{ progress }}" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100">{{ progress }}%</div>
                                             </div>
                                         </td>
