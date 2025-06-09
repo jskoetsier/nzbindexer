@@ -164,11 +164,13 @@
                 document.getElementById('test-result').innerHTML = '';
 
                 try {
-                    const response = await fetch('/api/v1/nntp/test-connection', {
+                    // Use the web route instead of the API route
+                    const response = await fetch('/admin/test-nntp-connection', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
+                        credentials: 'same-origin',
                         body: JSON.stringify({
                             server: server,
                             port: parseInt(port),

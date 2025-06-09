@@ -8,6 +8,7 @@ class CategoryBase(BaseModel):
     """
     Base category schema with common fields
     """
+
     name: Optional[str] = None
     description: Optional[str] = None
     active: Optional[bool] = True
@@ -15,12 +16,14 @@ class CategoryBase(BaseModel):
     color: Optional[str] = None
     sort_order: Optional[int] = 0
     parent_id: Optional[int] = None
+    newznab_category: Optional[int] = None  # Newznab/Sonarr category ID
 
 
 class CategoryCreate(CategoryBase):
     """
     Category creation schema
     """
+
     name: str
 
 
@@ -28,6 +31,7 @@ class CategoryUpdate(CategoryBase):
     """
     Category update schema
     """
+
     pass
 
 
@@ -35,6 +39,7 @@ class CategoryResponse(CategoryBase):
     """
     Category response schema
     """
+
     id: int
     name: str
     active: bool
@@ -49,6 +54,7 @@ class CategoryWithChildren(CategoryResponse):
     """
     Category response schema with children
     """
+
     children: List["CategoryWithChildren"] = []
 
     class Config:

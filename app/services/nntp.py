@@ -78,10 +78,20 @@ class NNTPService:
             # Filter groups by pattern if provided
             if pattern and pattern != "*":
                 pattern_regex = re.compile(pattern.replace("*", ".*"))
-                groups = [g for g in groups if pattern_regex.match(g[0])]
+                groups = [
+                    g
+                    for g in groups
+                    if pattern_regex.match(
+                        g[0] if isinstance(g[0], str) else g[0].decode()
+                    )
+                ]
 
             # Extract group name and description
-            result = [(g[0].decode(), g[1].decode()) for g in groups]
+            result = []
+            for g in groups:
+                name = g[0] if isinstance(g[0], str) else g[0].decode()
+                desc = g[1] if isinstance(g[1], str) else g[1].decode()
+                result.append((name, desc))
 
             conn.quit()
             logger.info(f"Retrieved {len(result)} newsgroups from server")
@@ -98,8 +108,11 @@ class NNTPService:
             conn = self.connect()
             resp, count, first, last, name = conn.group(group_name)
 
+            # Handle both string and bytes for name
+            name_str = name if isinstance(name, str) else name.decode()
+
             info = {
-                "name": name.decode(),
+                "name": name_str,
                 "count": count,
                 "first": first,
                 "last": last,
@@ -113,79 +126,161 @@ class NNTPService:
 
 
 async def discover_newsgroups(
-    db: AsyncSession, pattern: str = "*", active: bool = False
+    db: AsyncSession, pattern: str = "*", active: bool = False, batch_size: int = 100
 ) -> Dict[str, any]:
     """
     Discover newsgroups from the NNTP server and add them to the database
     Returns statistics about the discovery process
+
+    Args:
+        db: Database session
+        pattern: Pattern to filter newsgroups (e.g., "alt.*", "comp.sys.*")
+        active: Whether to set discovered groups as active
+        batch_size: Number of groups to process in each batch
+
+    Returns:
+        Dictionary with statistics about the discovery process
     """
+    # Import the global cancel flag
+    from app.main import discovery_cancel, discovery_running
+
+    # Set the global running flag
+    global discovery_running
+    global discovery_cancel
+
+    # Check if discovery is already running
+    if discovery_running:
+        raise ValueError("Discovery is already running")
+
+    # Reset cancel flag and set running flag
+    discovery_cancel = False
+    discovery_running = True
+
     stats = {
         "total": 0,
         "added": 0,
         "updated": 0,
         "skipped": 0,
         "failed": 0,
+        "processed": 0,
+        "cancelled": False,
     }
 
     try:
+        # Get app settings from database
+        from app.services.setting import get_app_settings
+
+        app_settings = await get_app_settings(db)
+
         # Check if NNTP server is configured
-        if not settings.NNTP_SERVER:
+        if not app_settings.nntp_server:
+            discovery_running = False
             raise ValueError("NNTP server not configured")
 
-        # Get newsgroups from server
-        nntp_service = NNTPService()
+        # Get newsgroups from server using settings from database
+        nntp_service = NNTPService(
+            server=app_settings.nntp_server,
+            port=(
+                app_settings.nntp_ssl_port
+                if app_settings.nntp_ssl
+                else app_settings.nntp_port
+            ),
+            use_ssl=app_settings.nntp_ssl,
+            username=app_settings.nntp_username,
+            password=app_settings.nntp_password,
+        )
+
+        logger.info(f"Retrieving newsgroups with pattern: {pattern}")
         newsgroups = nntp_service.get_newsgroups(pattern)
         stats["total"] = len(newsgroups)
+        logger.info(f"Found {stats['total']} newsgroups matching pattern: {pattern}")
 
-        # Process each newsgroup
-        for group_name, group_description in newsgroups:
-            try:
-                # Check if group already exists
-                existing_group = await get_group_by_name(db, group_name)
+        # Process newsgroups in batches
+        for i in range(0, len(newsgroups), batch_size):
+            # Check if cancellation was requested
+            if discovery_cancel:
+                logger.info("Discovery cancelled by user")
+                stats["cancelled"] = True
+                break
 
-                if existing_group:
-                    # Update existing group
-                    existing_group.description = group_description
-                    existing_group.updated_at = datetime.utcnow()
-                    db.add(existing_group)
-                    stats["updated"] += 1
-                else:
-                    # Create new group
-                    try:
-                        # Get additional group info
-                        group_info = nntp_service.get_group_info(group_name)
+            # Get the current batch
+            batch = newsgroups[i : i + batch_size]
+            logger.info(
+                f"Processing batch {i//batch_size + 1}/{(len(newsgroups) + batch_size - 1)//batch_size} ({len(batch)} groups)"
+            )
 
-                        # Create group
-                        group_data = GroupCreate(
-                            name=group_name,
-                            description=group_description,
-                            active=active,
-                            backfill=False,
-                            min_files=1,
-                            min_size=0,
-                        )
+            # Process each newsgroup in the batch
+            for group_name, group_description in batch:
+                try:
+                    # Check if cancellation was requested
+                    if discovery_cancel:
+                        logger.info("Discovery cancelled by user")
+                        stats["cancelled"] = True
+                        break
 
-                        new_group = await create_group(db, group_data)
+                    # Check if group already exists
+                    existing_group = await get_group_by_name(db, group_name)
 
-                        # Update article IDs
-                        new_group.first_article_id = group_info["first"]
-                        new_group.last_article_id = group_info["last"]
-                        new_group.current_article_id = group_info["first"]
-                        db.add(new_group)
+                    if existing_group:
+                        # Update existing group
+                        existing_group.description = group_description
+                        existing_group.updated_at = datetime.utcnow()
+                        db.add(existing_group)
+                        stats["updated"] += 1
+                    else:
+                        # Create new group
+                        try:
+                            # Get additional group info
+                            group_info = nntp_service.get_group_info(group_name)
 
-                        stats["added"] += 1
-                    except Exception as e:
-                        logger.error(f"Failed to create group {group_name}: {str(e)}")
-                        stats["failed"] += 1
-            except Exception as e:
-                logger.error(f"Error processing group {group_name}: {str(e)}")
-                stats["failed"] += 1
+                            # Create group
+                            group_data = GroupCreate(
+                                name=group_name,
+                                description=group_description,
+                                active=active,
+                                backfill=False,
+                                min_files=1,
+                                min_size=0,
+                            )
 
-        # Commit changes
-        await db.commit()
+                            new_group = await create_group(db, group_data)
+
+                            # Update article IDs
+                            new_group.first_article_id = group_info["first"]
+                            new_group.last_article_id = group_info["last"]
+                            new_group.current_article_id = group_info["first"]
+                            db.add(new_group)
+
+                            stats["added"] += 1
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to create group {group_name}: {str(e)}"
+                            )
+                            stats["failed"] += 1
+                except Exception as e:
+                    logger.error(f"Error processing group {group_name}: {str(e)}")
+                    stats["failed"] += 1
+
+                # Update processed count
+                stats["processed"] += 1
+
+            # Commit changes for this batch
+            await db.commit()
+
+            # Log progress
+            logger.info(
+                f"Progress: {stats['processed']}/{stats['total']} groups processed"
+            )
+            logger.info(
+                f"Stats so far: added={stats['added']}, updated={stats['updated']}, failed={stats['failed']}"
+            )
+
+        # Reset running flag
+        discovery_running = False
 
         return stats
     except Exception as e:
         await db.rollback()
+        discovery_running = False
         logger.error(f"Failed to discover newsgroups: {str(e)}")
         raise

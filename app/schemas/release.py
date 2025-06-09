@@ -5,6 +5,9 @@ Release schemas for API requests and responses
 from datetime import datetime
 from typing import List, Optional
 
+from app.schemas.category import CategoryResponse
+from app.schemas.group import GroupResponse
+
 from pydantic import BaseModel, Field
 
 
@@ -141,8 +144,6 @@ class ReleaseWithCategory(Release):
     Schema for Release with Category information
     """
 
-    from app.schemas.category import CategoryResponse
-
     category: CategoryResponse
 
 
@@ -150,8 +151,6 @@ class ReleaseWithGroup(Release):
     """
     Schema for Release with Group information
     """
-
-    from app.schemas.group import GroupResponse
 
     group: GroupResponse
 

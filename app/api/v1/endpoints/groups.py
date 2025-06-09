@@ -88,6 +88,26 @@ async def update_group_by_id(
     return group
 
 
+@router.patch("/{group_id}", response_model=GroupResponse)
+async def patch_group_by_id(
+    group_id: int,
+    group_in: GroupUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+) -> Any:
+    """
+    Partially update a group. Admin only.
+    """
+    group = await get_group(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+    group = await update_group(db, group_id, group_in)
+    return group
+
+
 @router.delete("/{group_id}", response_model=GroupResponse)
 async def delete_group_by_id(
     group_id: int,

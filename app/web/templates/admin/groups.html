@@ -49,7 +49,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for group in active_groups %}
+                                    {% for group in active_groups["items"] %}
                                     <tr>
                                         <td>{{ group.name }}</td>
                                         <td>{{ group.description|truncate(50) if group.description else "No description" }}</td>
@@ -69,6 +69,33 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+
+                            <!-- Pagination for active groups -->
+                            {% if active_groups["total"] > active_groups["per_page"] %}
+                            <nav aria-label="Active groups pagination">
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item {% if active_page == 1 %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page=1&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">First</a>
+                                    </li>
+                                    <li class="page-item {% if active_page == 1 %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page - 1 }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">Previous</a>
+                                    </li>
+
+                                    {% for p in range(max(1, active_page - 2), min(active_groups["pages"] + 1, active_page + 3)) %}
+                                    <li class="page-item {% if p == active_page %}active{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ p }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">{{ p }}</a>
+                                    </li>
+                                    {% endfor %}
+
+                                    <li class="page-item {% if active_page == active_groups["pages"] %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page + 1 }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">Next</a>
+                                    </li>
+                                    <li class="page-item {% if active_page == active_groups["pages"] %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_groups["pages"] }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page }}&tab=active">Last</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="tab-pane fade" id="inactive" role="tabpanel" aria-labelledby="inactive-tab">
@@ -84,7 +111,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for group in inactive_groups %}
+                                    {% for group in inactive_groups["items"] %}
                                     <tr>
                                         <td>{{ group.name }}</td>
                                         <td>{{ group.description|truncate(50) if group.description else "No description" }}</td>
@@ -104,6 +131,33 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+
+                            <!-- Pagination for inactive groups -->
+                            {% if inactive_groups["total"] > inactive_groups["per_page"] %}
+                            <nav aria-label="Inactive groups pagination">
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item {% if inactive_page == 1 %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page=1&backfill_page={{ backfill_page }}&tab=inactive">First</a>
+                                    </li>
+                                    <li class="page-item {% if inactive_page == 1 %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page - 1 }}&backfill_page={{ backfill_page }}&tab=inactive">Previous</a>
+                                    </li>
+
+                                    {% for p in range(max(1, inactive_page - 2), min(inactive_groups["pages"] + 1, inactive_page + 3)) %}
+                                    <li class="page-item {% if p == inactive_page %}active{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ p }}&backfill_page={{ backfill_page }}&tab=inactive">{{ p }}</a>
+                                    </li>
+                                    {% endfor %}
+
+                                    <li class="page-item {% if inactive_page == inactive_groups["pages"] %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page + 1 }}&backfill_page={{ backfill_page }}&tab=inactive">Next</a>
+                                    </li>
+                                    <li class="page-item {% if inactive_page == inactive_groups["pages"] %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_groups["pages"] }}&backfill_page={{ backfill_page }}&tab=inactive">Last</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="tab-pane fade" id="backfill" role="tabpanel" aria-labelledby="backfill-tab">
@@ -119,7 +173,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for group in backfill_groups %}
+                                    {% for group in backfill_groups["items"] %}
                                     <tr>
                                         <td>{{ group.name }}</td>
                                         <td>{{ group.description|truncate(50) if group.description else "No description" }}</td>
@@ -144,6 +198,33 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+
+                            <!-- Pagination for backfill groups -->
+                            {% if backfill_groups["total"] > backfill_groups["per_page"] %}
+                            <nav aria-label="Backfill groups pagination">
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item {% if backfill_page == 1 %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page=1&tab=backfill">First</a>
+                                    </li>
+                                    <li class="page-item {% if backfill_page == 1 %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page - 1 }}&tab=backfill">Previous</a>
+                                    </li>
+
+                                    {% for p in range(max(1, backfill_page - 2), min(backfill_groups["pages"] + 1, backfill_page + 3)) %}
+                                    <li class="page-item {% if p == backfill_page %}active{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ p }}&tab=backfill">{{ p }}</a>
+                                    </li>
+                                    {% endfor %}
+
+                                    <li class="page-item {% if backfill_page == backfill_groups["pages"] %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_page + 1 }}&tab=backfill">Next</a>
+                                    </li>
+                                    <li class="page-item {% if backfill_page == backfill_groups["pages"] %}disabled{% endif %}">
+                                        <a class="page-link" href="/admin/groups?active_page={{ active_page }}&inactive_page={{ inactive_page }}&backfill_page={{ backfill_groups["pages"] }}&tab=backfill">Last</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="tab-pane fade" id="discover" role="tabpanel" aria-labelledby="discover-tab">
@@ -154,7 +235,7 @@
                                         <h5 class="card-title mb-0">Discover Newsgroups</h5>
                                     </div>
                                     <div class="card-body">
-                                        <form id="discover-form">
+                                        <form id="discover-form" action="/admin/discover-groups" method="post">
                                             <div class="mb-3">
                                                 <label for="pattern" class="form-label">Pattern</label>
                                                 <input type="text" class="form-control" id="pattern" name="pattern" value="*" placeholder="e.g., alt.*, comp.sys.*">
@@ -164,11 +245,18 @@
                                                 <input type="checkbox" class="form-check-input" id="active" name="active">
                                                 <label class="form-check-label" for="active">Set discovered groups as active</label>
                                             </div>
-                                            <div class="d-grid">
+                                            <div class="mb-3">
+                                                <label for="batch_size" class="form-label">Batch Size</label>
+                                                <input type="number" class="form-control" id="batch_size" name="batch_size" value="100" min="10" max="1000">
+                                                <div class="form-text">Number of groups to process in each batch. Lower values reduce memory usage but take longer.</div>
+                                            </div>
+                                            <div class="d-grid gap-2">
                                                 <button type="submit" class="btn btn-primary" id="discover-button">
-                                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="discover-spinner"></span>
                                                     Discover Newsgroups
                                                 </button>
+                                                <a href="/admin/cancel-discovery" class="btn btn-danger {% if not discovery_running %}d-none{% endif %}" id="cancel-discovery-button">
+                                                    Cancel Discovery
+                                                </a>
                                             </div>
                                         </form>
                                     </div>
@@ -182,6 +270,12 @@
                                     <div class="card-body">
                                         <div id="discovery-results" class="d-none">
                                             <h5>Discovery Statistics</h5>
+                                            <div class="mb-3">
+                                                <div class="progress mb-2">
+                                                    <div class="progress-bar" role="progressbar" id="discovery-progress-bar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                                </div>
+                                                <small class="text-muted" id="discovery-progress-text">0 of 0 groups processed</small>
+                                            </div>
                                             <table class="table table-sm">
                                                 <tbody>
                                                     <tr>
@@ -236,6 +330,18 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Activate the correct tab based on URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTab = urlParams.get('tab');
+
+        if (activeTab) {
+            // Find the tab button and click it
+            const tabButton = document.getElementById(activeTab + '-tab');
+            if (tabButton) {
+                tabButton.click();
+            }
+        }
+
         // Set progress bar widths
         const progressBars = document.querySelectorAll('.progress-bar[data-width]');
         if (progressBars) {
@@ -295,81 +401,8 @@
             });
         }
 
-        // Handle newsgroup discovery form submission
-        const discoverForm = document.getElementById('discover-form');
-        if (discoverForm) {
-            discoverForm.addEventListener('submit', async function(e) {
-                e.preventDefault();
-
-                // Get form data
-                const pattern = document.getElementById('pattern').value || '*';
-                const active = document.getElementById('active').checked;
-
-                // Show spinner and disable button
-                const discoverButton = document.getElementById('discover-button');
-                const discoverSpinner = document.getElementById('discover-spinner');
-                discoverButton.disabled = true;
-                discoverSpinner.classList.remove('d-none');
-
-                // Hide previous results
-                document.getElementById('discovery-results').classList.add('d-none');
-                document.getElementById('discovery-placeholder').classList.remove('d-none');
-                document.getElementById('discovery-error').classList.add('d-none');
-                document.getElementById('discovery-success').classList.remove('d-none');
-
-                try {
-                    const response = await fetch('/api/v1/groups/discover', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            pattern: pattern,
-                            active: active
-                        })
-                    });
-
-                    // Hide placeholder
-                    document.getElementById('discovery-placeholder').classList.add('d-none');
-
-                    if (response.ok) {
-                        const data = await response.json();
-
-                        // Update results
-                        document.getElementById('result-total').textContent = data.total;
-                        document.getElementById('result-added').textContent = data.added;
-                        document.getElementById('result-updated').textContent = data.updated;
-                        document.getElementById('result-skipped').textContent = data.skipped;
-                        document.getElementById('result-failed').textContent = data.failed;
-
-                        // Show results
-                        document.getElementById('discovery-results').classList.remove('d-none');
-
-                        // If groups were added, refresh the page after a delay
-                        if (data.added > 0 || data.updated > 0) {
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 3000);
-                        }
-                    } else {
-                        const errorData = await response.json();
-                        document.getElementById('error-message').textContent = errorData.detail || 'Unknown error';
-                        document.getElementById('discovery-error').classList.remove('d-none');
-                        document.getElementById('discovery-success').classList.add('d-none');
-                        document.getElementById('discovery-results').classList.remove('d-none');
-                    }
-                } catch (error) {
-                    document.getElementById('error-message').textContent = error.message || 'Network error';
-                    document.getElementById('discovery-error').classList.remove('d-none');
-                    document.getElementById('discovery-success').classList.add('d-none');
-                    document.getElementById('discovery-results').classList.remove('d-none');
-                } finally {
-                    // Hide spinner and enable button
-                    discoverButton.disabled = false;
-                    discoverSpinner.classList.add('d-none');
-                }
-            });
-        }
+        // Let the form submit normally to /admin/groups/discover-simple
+        // The server will handle the form submission and redirect back to this page
     });
 </script>
 {% endblock %}

@@ -25,6 +25,9 @@ class Category(Base):
     # Category sorting
     sort_order = Column(Integer, default=0, nullable=False)
 
+    # External integration IDs
+    newznab_category = Column(Integer, nullable=True)  # Newznab/Sonarr category ID
+
     # Disqus settings
     disqus_identifier = Column(String(64), nullable=True)
 

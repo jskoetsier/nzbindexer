@@ -1,6 +1,16 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+# Set up logging first
+from app.core.logging import setup_logging
+
+setup_logging()
+
+import logging
+
+logger = logging.getLogger(__name__)
+logger.info("Starting NZB Indexer application")
+
 from app.api.v1.api import api_router
 
 from app.core.config import settings
@@ -23,7 +33,7 @@ from app.services.setting import get_app_settings, update_app_settings
 from app.services.user import create_user, get_user, get_user_by_email, update_user
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,6 +69,9 @@ templates = Jinja2Templates(directory="app/web/templates")
 templates.env.filters["timeago"] = timeago
 templates.env.filters["filesizeformat"] = filesizeformat
 
+# Add built-in functions to template environment
+templates.env.globals["max"] = max
+templates.env.globals["min"] = min
 
 # Add global template variables
 templates.env.globals.update(get_template_context())
@@ -534,26 +547,90 @@ async def admin_required(request: Request, db: AsyncSession = Depends(get_db)) -
     return user
 
 
+@app.get("/admin/categories", response_class=HTMLResponse)
+async def admin_categories(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(admin_required),
+):
+    """
+    Admin categories management page
+    """
+    # Get categories
+    from app.services.category import get_categories
+
+    categories = await get_categories(db)
+
+    return templates.TemplateResponse(
+        "admin/categories.html",
+        {
+            "request": request,
+            "user": user,
+            "categories": categories,
+            "messages": get_flash_messages(request),
+        },
+    )
+
+
 @app.get("/admin/groups", response_class=HTMLResponse)
 async def admin_groups(
     request: Request,
+    active_page: int = 1,
+    inactive_page: int = 1,
+    backfill_page: int = 1,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(admin_required),
 ):
     """
     Admin groups management page
     """
-    # Get active groups
-    active_groups_data = await get_groups(db, active=True)
-    active_groups = active_groups_data["items"]
+    # Set pagination parameters
+    per_page = 10
 
-    # Get inactive groups
-    inactive_groups_data = await get_groups(db, active=False)
-    inactive_groups = inactive_groups_data["items"]
+    # Get active groups with pagination
+    active_skip = (active_page - 1) * per_page
+    active_groups_data = await get_groups(
+        db, skip=active_skip, limit=per_page, active=True
+    )
 
-    # Get backfill groups
-    backfill_groups_data = await get_groups(db, backfill=True)
-    backfill_groups = backfill_groups_data["items"]
+    # Create pagination object for active groups
+    active_groups = {
+        "items": active_groups_data["items"],
+        "total": active_groups_data["total"],
+        "per_page": per_page,
+        "pages": (active_groups_data["total"] + per_page - 1) // per_page,
+    }
+
+    # Get inactive groups with pagination
+    inactive_skip = (inactive_page - 1) * per_page
+    inactive_groups_data = await get_groups(
+        db, skip=inactive_skip, limit=per_page, active=False
+    )
+
+    # Create pagination object for inactive groups
+    inactive_groups = {
+        "items": inactive_groups_data["items"],
+        "total": inactive_groups_data["total"],
+        "per_page": per_page,
+        "pages": (inactive_groups_data["total"] + per_page - 1) // per_page,
+    }
+
+    # Get backfill groups with pagination
+    backfill_skip = (backfill_page - 1) * per_page
+    backfill_groups_data = await get_groups(
+        db, skip=backfill_skip, limit=per_page, backfill=True
+    )
+
+    # Create pagination object for backfill groups
+    backfill_groups = {
+        "items": backfill_groups_data["items"],
+        "total": backfill_groups_data["total"],
+        "per_page": per_page,
+        "pages": (backfill_groups_data["total"] + per_page - 1) // per_page,
+    }
+
+    # Get global discovery status
+    global discovery_running
 
     return templates.TemplateResponse(
         "admin/groups.html",
@@ -563,6 +640,10 @@ async def admin_groups(
             "active_groups": active_groups,
             "inactive_groups": inactive_groups,
             "backfill_groups": backfill_groups,
+            "active_page": active_page,
+            "inactive_page": inactive_page,
+            "backfill_page": backfill_page,
+            "discovery_running": discovery_running,
             "messages": get_flash_messages(request),
         },
     )
@@ -623,6 +704,9 @@ async def admin_create_group(
         return RedirectResponse(
             url="/admin/groups/new", status_code=status.HTTP_303_SEE_OTHER
         )
+
+
+# This route was duplicated - removed the second instance
 
 
 @app.get("/admin/groups/{group_id}", response_class=HTMLResponse)
@@ -706,6 +790,101 @@ async def admin_update_group(
         )
 
 
+# Global variable to track if discovery is running and should be cancelled
+discovery_running = False
+discovery_cancel = False
+
+
+@app.get("/admin/cancel-discovery")
+async def admin_cancel_discovery(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(admin_required),
+):
+    """
+    Cancel the current discovery job
+    """
+    global discovery_cancel
+    discovery_cancel = True
+
+    flash_message(
+        request,
+        "Discovery job cancellation requested. The job will stop after the current batch completes.",
+        "warning",
+    )
+    return RedirectResponse(url="/admin/groups", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/discover-groups")
+async def admin_discover_groups(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(admin_required),
+    pattern: str = Form("*"),
+    active: bool = Form(False),
+    batch_size: int = Form(100),
+):
+    """
+    Discover newsgroups from NNTP server and add them to the database
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        logger.info(
+            f"Form data received: pattern={pattern}, active={active}, batch_size={batch_size}"
+        )
+
+        # Check if discovery is already running
+        global discovery_running
+        if discovery_running:
+            flash_message(
+                request,
+                "Discovery is already running. Please wait for it to complete or cancel it.",
+                "warning",
+            )
+            return RedirectResponse(
+                url="/admin/groups", status_code=status.HTTP_303_SEE_OTHER
+            )
+
+        # Discover newsgroups
+        from app.services.nntp import discover_newsgroups
+
+        logger.info(f"Discovering newsgroups with pattern: {pattern}, active: {active}")
+        stats = await discover_newsgroups(
+            db, pattern=pattern, active=active, batch_size=batch_size
+        )
+        logger.info(f"Discovery complete: {stats}")
+
+        # Flash success message with stats
+        if stats.get("cancelled", False):
+            flash_message(
+                request,
+                f"Discovery cancelled! Processed {stats['processed']} of {stats['total']} groups. Added {stats['added']}, updated {stats['updated']}, failed {stats['failed']}.",
+                "warning",
+            )
+        else:
+            flash_message(
+                request,
+                f"Discovery complete! Found {stats['total']} groups, added {stats['added']}, updated {stats['updated']}, skipped {stats['skipped']}, failed {stats['failed']}",
+                "success",
+            )
+
+    except ValueError as e:
+        logger.error(f"Value error in discover_groups: {str(e)}")
+        flash_message(request, f"Error: {str(e)}", "danger")
+    except Exception as e:
+        import traceback
+
+        logger.error(f"Error in discover_groups: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash_message(request, f"Error: {str(e)}", "danger")
+
+    # Redirect back to the groups page
+    return RedirectResponse(url="/admin/groups", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @app.post("/admin/groups/{group_id}/delete", response_class=HTMLResponse)
 async def admin_delete_group(
     request: Request,
@@ -755,6 +934,51 @@ async def admin_settings(
             "messages": get_flash_messages(request),
         },
     )
+
+
+@app.post("/admin/test-nntp-connection")
+async def admin_test_nntp_connection(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(admin_required),
+):
+    """
+    Test NNTP connection with provided settings
+    """
+    # Get request body
+    data = await request.json()
+
+    try:
+        # Create NNTP service with provided settings
+        from app.services.nntp import NNTPService
+
+        nntp_service = NNTPService(
+            server=data.get("server"),
+            port=data.get("port") if not data.get("ssl") else data.get("ssl_port"),
+            use_ssl=data.get("ssl"),
+            username=data.get("username"),
+            password=data.get("password"),
+        )
+
+        # Test connection
+        conn = nntp_service.connect()
+
+        # Get server info
+        welcome = conn.welcome
+
+        # Close connection
+        conn.quit()
+
+        return {
+            "status": "success",
+            "message": "Connection successful",
+            "welcome": welcome.decode() if isinstance(welcome, bytes) else welcome,
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": f"Connection failed: {str(e)}"},
+        )
 
 
 @app.post("/admin/settings", response_class=HTMLResponse)

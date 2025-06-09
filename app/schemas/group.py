@@ -8,18 +8,21 @@ class GroupBase(BaseModel):
     """
     Base group schema with common fields
     """
+
     name: Optional[str] = None
     description: Optional[str] = None
     active: Optional[bool] = True
     backfill: Optional[bool] = False
     min_files: Optional[int] = 1
     min_size: Optional[int] = 0
+    backfill_target: Optional[int] = None
 
 
 class GroupCreate(GroupBase):
     """
     Group creation schema
     """
+
     name: str
 
 
@@ -27,6 +30,7 @@ class GroupUpdate(GroupBase):
     """
     Group update schema
     """
+
     pass
 
 
@@ -34,6 +38,7 @@ class GroupResponse(GroupBase):
     """
     Group response schema
     """
+
     id: int
     name: str
     active: bool

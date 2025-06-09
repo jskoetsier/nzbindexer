@@ -56,9 +56,9 @@ class ArticleService:
 
             # Select the group
             resp, count, first, last, name = conn.group(group.name)
-            logger.info(
-                f"Selected group {name.decode()}: {count} articles, {first}-{last}"
-            )
+            # Handle both string and bytes for name
+            name_str = name if isinstance(name, str) else name.decode()
+            logger.info(f"Selected group {name_str}: {count} articles, {first}-{last}")
 
             # Adjust start and end if needed
             start_id = max(start_id, first)
@@ -87,19 +87,38 @@ class ArticleService:
 
                     # Process each article
                     for article in articles:
+                        article_num = (
+                            None  # Initialize article_num to avoid reference errors
+                        )
                         try:
-                            # Extract article info
-                            (
-                                article_num,
-                                subject,
-                                from_addr,
-                                date,
-                                message_id,
-                                references,
-                                bytes_count,
-                                lines_count,
-                                other,
-                            ) = article
+                            # Extract article info - handle different tuple lengths
+                            if len(article) >= 9:
+                                (
+                                    article_num,
+                                    subject,
+                                    from_addr,
+                                    date,
+                                    message_id,
+                                    references,
+                                    bytes_count,
+                                    lines_count,
+                                    other,
+                                ) = article
+                            elif len(article) == 2:
+                                # Some NNTP servers return only article number and message ID
+                                article_num, message_id = article
+                                subject = ""
+                                from_addr = ""
+                                date = None
+                                references = ""
+                                bytes_count = 0
+                                lines_count = 0
+                                other = {}
+                            else:
+                                # Handle other unexpected formats
+                                logger.warning(f"Unexpected article format: {article}")
+                                stats["skipped"] += 1
+                                continue
 
                             # Skip articles with no subject or message_id
                             if not subject or not message_id:
@@ -130,9 +149,12 @@ class ArticleService:
                             stats["processed"] += 1
 
                         except Exception as e:
-                            logger.error(
-                                f"Error processing article {article_num}: {str(e)}"
-                            )
+                            error_msg = f"Error processing article: {str(e)}"
+                            if article_num is not None:
+                                error_msg = (
+                                    f"Error processing article {article_num}: {str(e)}"
+                                )
+                            logger.error(error_msg)
                             stats["failed"] += 1
 
                 except Exception as e:
@@ -273,20 +295,43 @@ class ArticleService:
         # Get default category ID for uncategorized releases
         from app.db.models.category import Category
 
-        query = select(Category).filter(Category.name == "Other")
-        result = await db.execute(query)
-        default_category = result.scalars().first()
+        try:
+            query = select(Category).filter(Category.name == "Other")
+            result = await db.execute(query)
+            default_category = result.scalars().first()
 
-        if not default_category:
-            # Create default category if it doesn't exist
-            default_category = Category(
-                name="Other",
-                description="Uncategorized releases",
-                active=True,
-                sort_order=999,
-            )
-            db.add(default_category)
-            await db.commit()
+            if not default_category:
+                # Create default category if it doesn't exist
+                default_category = Category(
+                    name="Other",
+                    description="Uncategorized releases",
+                    active=True,
+                    sort_order=999,
+                )
+                db.add(default_category)
+                await db.commit()
+                await db.refresh(default_category)
+        except Exception as e:
+            # If there's an error creating the category (e.g., it already exists),
+            # try to get it again
+            logger.warning(f"Error creating default category: {str(e)}")
+            await db.rollback()
+
+            # Try to get the category again
+            query = select(Category).filter(Category.name == "Other")
+            result = await db.execute(query)
+            default_category = result.scalars().first()
+
+            # If we still can't get it, use the first available category
+            if not default_category:
+                query = select(Category).limit(1)
+                result = await db.execute(query)
+                default_category = result.scalars().first()
+
+                # If there are no categories at all, we can't proceed
+                if not default_category:
+                    logger.error("No categories found in database")
+                    return 0
 
         # Process each binary
         for binary_key, binary in binaries.items():
@@ -356,12 +401,34 @@ class ArticleService:
 
 
 async def process_group_update(
-    db: AsyncSession, group: Group, limit: int = 1000
+    db: AsyncSession,
+    group: Group,
+    limit: int = 1000,
+    nntp_service: Optional[NNTPService] = None,
 ) -> Dict[str, any]:
     """
     Process new articles for a group
     """
-    article_service = ArticleService()
+    # Get app settings if nntp_service is not provided
+    if not nntp_service:
+        from app.services.setting import get_app_settings
+
+        app_settings = await get_app_settings(db)
+
+        # Create NNTP service with settings from database
+        nntp_service = NNTPService(
+            server=app_settings.nntp_server,
+            port=(
+                app_settings.nntp_ssl_port
+                if app_settings.nntp_ssl
+                else app_settings.nntp_port
+            ),
+            use_ssl=app_settings.nntp_ssl,
+            username=app_settings.nntp_username,
+            password=app_settings.nntp_password,
+        )
+
+    article_service = ArticleService(nntp_service=nntp_service)
 
     # Process articles from current_article_id to last_article_id
     stats = await article_service.process_articles(
@@ -379,24 +446,64 @@ async def process_group_update(
 
 
 async def process_group_backfill(
-    db: AsyncSession, group: Group, limit: int = 1000
+    db: AsyncSession,
+    group: Group,
+    limit: int = 1000,
+    nntp_service: Optional[NNTPService] = None,
 ) -> Dict[str, any]:
     """
     Process backfill articles for a group
     """
-    article_service = ArticleService()
+    # Get app settings if nntp_service is not provided
+    if not nntp_service:
+        from app.services.setting import get_app_settings
+
+        app_settings = await get_app_settings(db)
+
+        # Create NNTP service with settings from database
+        nntp_service = NNTPService(
+            server=app_settings.nntp_server,
+            port=(
+                app_settings.nntp_ssl_port
+                if app_settings.nntp_ssl
+                else app_settings.nntp_port
+            ),
+            use_ssl=app_settings.nntp_ssl,
+            username=app_settings.nntp_username,
+            password=app_settings.nntp_password,
+        )
+
+    article_service = ArticleService(nntp_service=nntp_service)
+
+    # Ensure backfill_target is valid
+    if group.backfill_target <= 0:
+        logger.warning(f"Invalid backfill target for group {group.name}: {group.backfill_target}")
+        return {"processed": 0, "total": 0, "skipped": 0, "failed": 0, "binaries": 0, "releases": 0}
+
+    # Determine the range of articles to process
+    start_id = group.backfill_target
+    end_id = group.current_article_id - 1
+
+    # If backfill_target is greater than current_article_id, swap them
+    if start_id >= end_id:
+        logger.warning(f"Backfill target {start_id} is greater than or equal to current article ID {end_id} for group {group.name}")
+        # Process a small batch of articles before the backfill target
+        end_id = start_id
+        start_id = max(1, start_id - limit)
+        logger.info(f"Adjusted backfill range to {start_id}-{end_id} for group {group.name}")
 
     # Process articles from backfill_target to current_article_id
     stats = await article_service.process_articles(
-        db, group, group.backfill_target, group.current_article_id - 1, limit
+        db, group, start_id, end_id, limit
     )
 
     # Update group's backfill_target if we processed some articles
     if stats["processed"] > 0:
         # Move backfill_target forward
-        group.backfill_target += stats["processed"]
+        group.backfill_target = start_id + stats["processed"]
         group.last_updated = datetime.utcnow()
         db.add(group)
         await db.commit()
+        logger.info(f"Updated backfill target to {group.backfill_target} for group {group.name}")
 
     return stats

@@ -54,8 +54,18 @@ async def update_group(group_id: int) -> None:
             # Get app settings
             app_settings = await get_app_settings(db)
 
-            # Create NNTP service
-            nntp_service = NNTPService()
+            # Create NNTP service with settings from database
+            nntp_service = NNTPService(
+                server=app_settings.nntp_server,
+                port=(
+                    app_settings.nntp_ssl_port
+                    if app_settings.nntp_ssl
+                    else app_settings.nntp_port
+                ),
+                use_ssl=app_settings.nntp_ssl,
+                username=app_settings.nntp_username,
+                password=app_settings.nntp_password,
+            )
 
             # Get group info from NNTP server
             try:
@@ -77,7 +87,8 @@ async def update_group(group_id: int) -> None:
 
                 # Process new articles
                 from app.services.article import process_group_update
-                await process_group_update(db, group)
+
+                await process_group_update(db, group, nntp_service=nntp_service)
 
             except Exception as e:
                 logger.error(f"Error updating group {group.name}: {str(e)}")
@@ -116,8 +127,18 @@ async def backfill_group(group_id: int) -> None:
             # Get app settings
             app_settings = await get_app_settings(db)
 
-            # Create NNTP service
-            nntp_service = NNTPService()
+            # Create NNTP service with settings from database
+            nntp_service = NNTPService(
+                server=app_settings.nntp_server,
+                port=(
+                    app_settings.nntp_ssl_port
+                    if app_settings.nntp_ssl
+                    else app_settings.nntp_port
+                ),
+                use_ssl=app_settings.nntp_ssl,
+                username=app_settings.nntp_username,
+                password=app_settings.nntp_password,
+            )
 
             # Get group info from NNTP server
             try:
@@ -148,7 +169,8 @@ async def backfill_group(group_id: int) -> None:
 
                 # Process backfill articles
                 from app.services.article import process_group_backfill
-                await process_group_backfill(db, group)
+
+                await process_group_backfill(db, group, nntp_service=nntp_service)
 
             except Exception as e:
                 logger.error(f"Error backfilling group {group.name}: {str(e)}")
