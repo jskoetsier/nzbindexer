@@ -259,10 +259,14 @@
             };
 
             try {
+                // Get the CSRF token from the cookie if available
+                const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+
                 const response = await fetch('/api/v1/categories/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken || '',
                     },
                     credentials: 'same-origin',
                     body: JSON.stringify(data)

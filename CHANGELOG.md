@@ -5,6 +5,23 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2025-06-10
+
+### Added
+- Support for obfuscated binary posts with yEnc header detection
+- Enhanced article processing to extract filenames from yEnc headers
+- Improved binary post detection for modern Usenet posts
+- Diagnostic tools for NNTP connection and article processing
+- Database optimization for SQLite to reduce locking issues
+- API authentication improvements for web interface
+
+### Fixed
+- Fixed binary post detection for posts with random or empty subjects
+- Improved error handling for Unicode encoding issues in article subjects
+- Enhanced NNTP connection stability with better error recovery
+- Fixed database locking issues with concurrent article processing
+- Resolved issues with empty articles in binary groups
+
 ## [0.7.0] - 2023-12-15
 
 ### Added

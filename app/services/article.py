@@ -154,26 +154,43 @@ class ArticleService:
                                 stats["skipped"] += 1
                                 continue
 
-                            # Decode bytes to strings
-                            subject = (
-                                subject.decode()
-                                if isinstance(subject, bytes)
-                                else subject
-                            )
-                            message_id = (
-                                message_id.decode()
-                                if isinstance(message_id, bytes)
-                                else message_id
-                            )
+                            # Decode bytes to strings with error handling
+                            try:
+                                subject = (
+                                    subject.decode('utf-8', errors='replace')
+                                    if isinstance(subject, bytes)
+                                    else subject
+                                )
+                                # Replace any surrogate characters that might cause encoding issues
+                                subject = ''.join(c if ord(c) < 0xD800 or ord(c) > 0xDFFF else '?' for c in subject)
+                            except Exception:
+                                subject = "Unknown Subject"
+
+                            try:
+                                message_id = (
+                                    message_id.decode('utf-8', errors='replace')
+                                    if isinstance(message_id, bytes)
+                                    else message_id
+                                )
+                                # Replace any surrogate characters that might cause encoding issues
+                                message_id = ''.join(c if ord(c) < 0xD800 or ord(c) > 0xDFFF else '?' for c in message_id)
+                            except Exception:
+                                message_id = f"unknown-{article_num}@placeholder.nzb"
+
+                            # Log the subject for debugging
+                            logger.debug(f"Processing article {article_num}: {subject}")
 
                             # Process binary post
-                            await self._process_binary_post(
+                            binary_result = await self._process_binary_post(
                                 subject,
                                 message_id,
                                 bytes_count,
                                 binaries,
                                 binary_subjects,
                             )
+
+                            if binary_result:
+                                logger.info(f"Found binary post: {subject} -> {binary_result}")
 
                             stats["processed"] += 1
 
@@ -222,9 +239,65 @@ class ArticleService:
         """
         Process a binary post from a newsgroup
         """
-        # Parse subject to extract binary name and part info
+        # First, try to parse subject to extract binary name and part info
         binary_name, part_num, total_parts = self._parse_binary_subject(subject)
 
+        # If we couldn't extract binary info from the subject, check if this is an obfuscated binary post
+        # by looking for yEnc headers in the article content
+        if not binary_name or not part_num:
+            # For obfuscated posts, we need to get the article content to check for yEnc headers
+            try:
+                # Connect to NNTP server if needed
+                if not hasattr(self, '_conn') or self._conn is None:
+                    self._conn = self.nntp_service.connect()
+
+                # Get the article content
+                try:
+                    resp, article_info = self._conn.article(f"<{message_id}>")
+
+                    # Look for yEnc headers in the article content
+                    yenc_begin = None
+                    yenc_part = None
+                    yenc_name = None
+
+                    for line in article_info.lines:
+                        line_str = line.decode('utf-8', errors='replace') if isinstance(line, bytes) else line
+
+                        # Check for yEnc begin line
+                        if line_str.startswith("=ybegin "):
+                            yenc_begin = line_str
+
+                            # Extract part info
+                            part_match = re.search(r"part=(\d+)\s+total=(\d+)", line_str)
+                            if part_match:
+                                part_num = int(part_match.group(1))
+                                total_parts = int(part_match.group(2))
+
+                            # Extract name
+                            name_match = re.search(r"name=(.*?)$", line_str)
+                            if name_match:
+                                yenc_name = name_match.group(1).strip()
+
+                        # Check for yEnc part line
+                        elif line_str.startswith("=ypart "):
+                            yenc_part = line_str
+
+                        # If we found both yEnc begin and part lines, we can stop
+                        if yenc_begin and yenc_part and yenc_name:
+                            break
+
+                    # If we found yEnc headers, use the name from the yEnc header as the binary name
+                    if yenc_name and part_num and total_parts:
+                        binary_name = yenc_name
+                        logger.debug(f"Found obfuscated binary post: {subject} -> {binary_name} (part {part_num}/{total_parts})")
+
+                except Exception as e:
+                    logger.debug(f"Error getting article content: {str(e)}")
+
+            except Exception as e:
+                logger.debug(f"Error checking for obfuscated binary post: {str(e)}")
+
+        # If we still couldn't extract binary info, skip this post
         if not binary_name or not part_num:
             return
 
@@ -251,6 +324,9 @@ class ArticleService:
         # Update total parts if we have a new value
         if total_parts and binaries[binary_key]["total_parts"] < total_parts:
             binaries[binary_key]["total_parts"] = total_parts
+
+        # Return binary info for logging
+        return f"{binary_name} (part {part_num}/{total_parts})"
 
     def _parse_binary_subject(
         self, subject: str
@@ -295,6 +371,68 @@ class ArticleService:
             part = int(match.group(2))
             total = int(match.group(3))
             return name, part, total
+
+        # Pattern: "name - File 01 of 10 - description"
+        match = re.search(r"^(.*?)\s*-\s*[Ff]ile\s*(\d+)\s*of\s*(\d+)", subject)
+        if match:
+            name = match.group(1).strip()
+            part = int(match.group(2))
+            total = int(match.group(3))
+            return name, part, total
+
+        # Pattern: "name - yEnc (01/10) - description"
+        match = re.search(r"^(.*?)\s*-\s*yEnc\s*\((\d+)/(\d+)\)", subject)
+        if match:
+            name = match.group(1).strip()
+            part = int(match.group(2))
+            total = int(match.group(3))
+            return name, part, total
+
+        # Pattern: "name - yEnc - (01/10) - description"
+        match = re.search(r"^(.*?)\s*-\s*yEnc\s*-\s*\((\d+)/(\d+)\)", subject)
+        if match:
+            name = match.group(1).strip()
+            part = int(match.group(2))
+            total = int(match.group(3))
+            return name, part, total
+
+        # Pattern: "name (yEnc 01/10) - description"
+        match = re.search(r"^(.*?)\s*\(yEnc\s*(\d+)/(\d+)\)", subject)
+        if match:
+            name = match.group(1).strip()
+            part = int(match.group(2))
+            total = int(match.group(3))
+            return name, part, total
+
+        # Pattern: "name - yEnc (01/10)"
+        match = re.search(r"^(.*?)\s*-\s*yEnc\s*\((\d+)/(\d+)\)\s*$", subject)
+        if match:
+            name = match.group(1).strip()
+            part = int(match.group(2))
+            total = int(match.group(3))
+            return name, part, total
+
+        # Pattern: "name [01/10]"
+        match = re.search(r"^(.*?)\s*\[(\d+)/(\d+)\]\s*$", subject)
+        if match:
+            name = match.group(1).strip()
+            part = int(match.group(2))
+            total = int(match.group(3))
+            return name, part, total
+
+        # Pattern: "name (01/10)"
+        match = re.search(r"^(.*?)\s*\((\d+)/(\d+)\)\s*$", subject)
+        if match:
+            name = match.group(1).strip()
+            part = int(match.group(2))
+            total = int(match.group(3))
+            return name, part, total
+
+        # Single file pattern: "name - yEnc"
+        match = re.search(r"^(.*?)\s*-\s*yEnc\s*$", subject)
+        if match:
+            name = match.group(1).strip()
+            return name, 1, 1  # Treat as a single part
 
         # No pattern matched
         return None, None, None
@@ -365,11 +503,24 @@ class ArticleService:
         # Process each binary
         for binary_key, binary in binaries.items():
             try:
-                # Check if binary is complete
-                if (
-                    binary["total_parts"] > 0
-                    and len(binary["parts"]) >= binary["total_parts"]
-                ):
+                # Check if we should create a release for this binary
+                create_release_conditions = [
+                    # Condition 1: Binary is complete (all parts available)
+                    binary["total_parts"] > 0 and len(binary["parts"]) >= binary["total_parts"],
+
+                    # Condition 2: Binary has at least 1 part and we don't know the total parts
+                    binary["total_parts"] == 0 and len(binary["parts"]) >= 1,
+
+                    # Condition 3: Binary has at least 50% of parts and at least 3 parts
+                    binary["total_parts"] > 0 and len(binary["parts"]) >= max(3, binary["total_parts"] // 2)
+                ]
+
+                if any(create_release_conditions):
+                    # Calculate completion percentage
+                    completion = 100.0
+                    if binary["total_parts"] > 0:
+                        completion = min(100.0, (len(binary["parts"]) / binary["total_parts"]) * 100.0)
+
                     # Check if release already exists
                     from app.services.release import create_release_guid
 
@@ -380,11 +531,19 @@ class ArticleService:
                     existing_release = result.scalars().first()
 
                     if existing_release:
-                        # Update existing release
+                        # Update existing release if we have more parts now
+                        if len(binary["parts"]) > existing_release.files:
+                            existing_release.files = len(binary["parts"])
+                            existing_release.size = binary["size"]
+                            existing_release.completion = completion
+                            db.add(existing_release)
+                            await db.commit()
+                            logger.info(f"Updated release {existing_release.id} with more parts: {len(binary['parts'])}")
                         continue
 
                     # Create new release
                     subject = binary_subjects.get(binary_key, binary["name"])
+                    logger.info(f"Creating release for binary: {binary['name']} with {len(binary['parts'])}/{binary['total_parts']} parts")
 
                     from app.schemas.release import ReleaseCreate
 
@@ -397,7 +556,7 @@ class ArticleService:
                         guid=guid,
                         size=binary["size"],
                         files=len(binary["parts"]),
-                        completion=100.0,  # Complete binary
+                        completion=completion,
                         posted_date=datetime.utcnow(),  # Should use article date
                         status=1,  # Active
                         passworded=0,  # Unknown

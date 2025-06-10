@@ -17,105 +17,115 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col">
-        <div class="card">
+    <div class="col-md-3">
+        <div class="card mb-4">
             <div class="card-header bg-light">
-                <ul class="nav nav-pills card-header-pills" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="true">All</button>
-                    </li>
-                    {% for category in categories %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="{{ category.name|lower }}-tab" data-bs-toggle="tab" data-bs-target="#{{ category.name|lower }}" type="button" role="tab" aria-controls="{{ category.name|lower }}" aria-selected="false">{{ category.name }}</button>
-                    </li>
-                    {% endfor %}
-                </ul>
+                <h5 class="mb-0">Categories</h5>
             </div>
-            <div class="card-body">
-                <div class="tab-content">
-                    <div class="tab-pane fade show active" id="all" role="tabpanel" aria-labelledby="all-tab">
-                        {% if releases %}
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Category</th>
-                                            <th>Size</th>
-                                            <th>Age</th>
-                                            <th>Files</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for release in releases %}
-                                        <tr>
-                                            <td>{{ release.name }}</td>
-                                            <td>
-                                                <span class="badge bg-secondary">{{ release.category.name if release.category else "Uncategorized" }}</span>
-                                            </td>
-                                            <td>{{ release.size|filesizeformat }}</td>
-                                            <td>{{ release.created_at|timeago }}</td>
-                                            <td>{{ release.file_count }}</td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="/releases/{{ release.id }}" class="btn btn-outline-primary">Details</a>
-                                                    <a href="/releases/{{ release.id }}/download" class="btn btn-success">Download NZB</a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="alert alert-info">
-                                No releases found. {% if search %}Try a different search term.{% endif %}
-                            </div>
-                        {% endif %}
-                    </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    <a href="/browse{% if search %}?search={{ search }}{% endif %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {% if not category_id %}active{% endif %}">
+                        All Categories
+                        <span class="badge bg-primary rounded-pill">{{ pagination.total }}</span>
+                    </a>
 
-                    {% for category in categories %}
-                    <div class="tab-pane fade" id="{{ category.name|lower }}" role="tabpanel" aria-labelledby="{{ category.name|lower }}-tab">
-                        {% set category_releases = releases|selectattr("category.id", "equalto", category.id)|list %}
-                        {% if category_releases %}
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Size</th>
-                                            <th>Age</th>
-                                            <th>Files</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for release in category_releases %}
-                                        <tr>
-                                            <td>{{ release.name }}</td>
-                                            <td>{{ release.size|filesizeformat }}</td>
-                                            <td>{{ release.created_at|timeago }}</td>
-                                            <td>{{ release.file_count }}</td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="/releases/{{ release.id }}" class="btn btn-outline-primary">Details</a>
-                                                    <a href="/releases/{{ release.id }}/download" class="btn btn-success">Download NZB</a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="alert alert-info">
-                                No releases found in this category. {% if search %}Try a different search term.{% endif %}
-                            </div>
-                        {% endif %}
+                    {% for main_cat in main_categories %}
+                    <div class="category-group">
+                        <a href="/browse?category_id={{ main_cat.id }}{% if search %}&search={{ search }}{% endif %}"
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {% if category_id == main_cat.id %}active{% endif %}">
+                            <span>
+                                <i class="bi bi-caret-right-fill me-1 category-toggle" data-category="{{ main_cat.id }}"></i>
+                                {{ main_cat.name }}
+                            </span>
+                            <span class="badge bg-secondary rounded-pill">{{ main_cat.release_count }}</span>
+                        </a>
+
+                        <div class="subcategories" id="subcategories-{{ main_cat.id }}" style="display: {% if category_id == main_cat.id or has_active_subcategory(main_cat.id, category_id) %}block{% else %}none{% endif %};">
+                            {% for subcat in subcategories[main_cat.id] if subcategories[main_cat.id] %}
+                            <a href="/browse?category_id={{ subcat.id }}{% if search %}&search={{ search }}{% endif %}"
+                               class="list-group-item list-group-item-action subcategory d-flex justify-content-between align-items-center {% if category_id == subcat.id %}active{% endif %}">
+                                <span class="ms-4">{{ subcat.name }}</span>
+                                <span class="badge bg-secondary rounded-pill">{{ subcat.release_count }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    {% if current_category %}
+                        {{ current_category.name }} Releases
+                    {% else %}
+                        All Releases
+                    {% endif %}
+                </h5>
+                <div>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            Sort By
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/browse?sort_by=added_date&sort_desc=true{% if category_id %}&category_id={{ category_id }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Newest First</a></li>
+                            <li><a class="dropdown-item" href="/browse?sort_by=added_date&sort_desc=false{% if category_id %}&category_id={{ category_id }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Oldest First</a></li>
+                            <li><a class="dropdown-item" href="/browse?sort_by=name&sort_desc=false{% if category_id %}&category_id={{ category_id }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Name (A-Z)</a></li>
+                            <li><a class="dropdown-item" href="/browse?sort_by=name&sort_desc=true{% if category_id %}&category_id={{ category_id }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Name (Z-A)</a></li>
+                            <li><a class="dropdown-item" href="/browse?sort_by=size&sort_desc=true{% if category_id %}&category_id={{ category_id }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Size (Largest)</a></li>
+                            <li><a class="dropdown-item" href="/browse?sort_by=size&sort_desc=false{% if category_id %}&category_id={{ category_id }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Size (Smallest)</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if releases %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Size</th>
+                                    <th>Age</th>
+                                    <th>Files</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for release in releases %}
+                                <tr>
+                                    <td>{{ release.name }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ release.category.name if release.category else "Uncategorized" }}</span>
+                                    </td>
+                                    <td>{{ release.size|filesizeformat }}</td>
+                                    <td>{{ release.added_date|timeago }}</td>
+                                    <td>{{ release.files }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="/releases/{{ release.id }}" class="btn btn-outline-primary">Details</a>
+                                            {% if user %}
+                                            <a href="/releases/{{ release.id }}/download" class="btn btn-success">Download NZB</a>
+                                            {% else %}
+                                            <a href="/login" class="btn btn-outline-secondary">Login to Download</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        No releases found. {% if search %}Try a different search term.{% endif %}
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -234,4 +244,58 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+<style>
+    .category-toggle {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .category-toggle.expanded {
+        transform: rotate(90deg);
+    }
+    .subcategory {
+        padding-left: 2rem;
+        background-color: #f8f9fa;
+    }
+    .list-group-item.active {
+        z-index: 2;
+        color: #fff;
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle subcategories when clicking on category
+        const toggles = document.querySelectorAll('.category-toggle');
+        toggles.forEach(toggle => {
+            const categoryId = toggle.dataset.category;
+            const subcategoriesDiv = document.getElementById(`subcategories-${categoryId}`);
+
+            // Set initial state
+            if (subcategoriesDiv.style.display === 'block') {
+                toggle.classList.add('expanded');
+            }
+
+            // Add click event
+            toggle.parentElement.parentElement.addEventListener('click', function(e) {
+                // Only toggle if clicking on the category itself, not its children
+                if (e.target === toggle || e.target === toggle.parentElement || e.target === toggle.parentElement.parentElement) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (subcategoriesDiv.style.display === 'none') {
+                        subcategoriesDiv.style.display = 'block';
+                        toggle.classList.add('expanded');
+                    } else {
+                        subcategoriesDiv.style.display = 'none';
+                        toggle.classList.remove('expanded');
+                    }
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

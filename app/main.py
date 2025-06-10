@@ -124,6 +124,8 @@ async def browse(
     category_id: Optional[int] = None,
     group_id: Optional[int] = None,
     page: int = 1,
+    sort_by: str = "added_date",
+    sort_desc: bool = True,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -146,23 +148,77 @@ async def browse(
         search=search,
         category_id=category_id,
         group_id=group_id,
-        sort_by="added_date",
-        sort_desc=True,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
     )
 
-    # Get categories for filtering
+    # Get categories organized by parent/child relationship
     from app.db.models.category import Category
-    from sqlalchemy import select
+    from app.db.models.release import Release
+    from sqlalchemy import func, select, and_, or_
 
+    # Get all categories
     query = (
-        select(Category).filter(Category.active == True).order_by(Category.sort_order)
+        select(Category, func.count(Release.id).label("release_count"))
+        .outerjoin(Release, and_(Release.category_id == Category.id, Release.status == 1))
+        .filter(Category.active == True)
+        .group_by(Category.id)
+        .order_by(Category.sort_order)
     )
     result = await db.execute(query)
-    categories = result.scalars().all()
+    categories_with_counts = result.all()
+
+    # Organize categories into main categories and subcategories
+    main_categories = []
+    subcategories = {}
+    current_category = None
+
+    for cat, release_count in categories_with_counts:
+        cat.release_count = release_count  # Add release count to category object
+
+        if cat.parent_id is None:
+            # This is a main category
+            main_categories.append(cat)
+            subcategories[cat.id] = []
+        else:
+            # This is a subcategory
+            if cat.parent_id in subcategories:
+                subcategories[cat.parent_id].append(cat)
+
+        # Check if this is the currently selected category
+        if category_id and cat.id == category_id:
+            current_category = cat
+
+    # Add helper function to check if a main category has an active subcategory
+    def has_active_subcategory(main_cat_id, active_cat_id):
+        if not active_cat_id:
+            return False
+        for subcat in subcategories.get(main_cat_id, []):
+            if subcat.id == active_cat_id:
+                return True
+        return False
+
+    # Add the helper function to the template context
+    templates.env.globals["has_active_subcategory"] = has_active_subcategory
 
     # Create pagination object
     total = releases_data["total"]
     releases = releases_data["items"]
+
+    # Build pagination URLs with all parameters
+    def build_url(p):
+        url = f"/browse?page={p}"
+        if search:
+            url += f"&search={search}"
+        if category_id:
+            url += f"&category_id={category_id}"
+        if group_id:
+            url += f"&group_id={group_id}"
+        if sort_by != "added_date":
+            url += f"&sort_by={sort_by}"
+        if not sort_desc:
+            url += f"&sort_desc=false"
+        return url
 
     pagination = {
         "page": page,
@@ -171,24 +227,10 @@ async def browse(
         "pages": (total + per_page - 1) // per_page,
         "has_prev": page > 1,
         "has_next": page < ((total + per_page - 1) // per_page),
-        "prev_url": (
-            f"/browse?page={page-1}&search={search}"
-            if search and page > 1
-            else f"/browse?page={page-1}" if page > 1 else None
-        ),
-        "next_url": (
-            f"/browse?page={page+1}&search={search}"
-            if search and page < ((total + per_page - 1) // per_page)
-            else (
-                f"/browse?page={page+1}"
-                if page < ((total + per_page - 1) // per_page)
-                else None
-            )
-        ),
+        "prev_url": build_url(page-1) if page > 1 else None,
+        "next_url": build_url(page+1) if page < ((total + per_page - 1) // per_page) else None,
         "iter_pages": lambda: range(1, ((total + per_page - 1) // per_page) + 1),
-        "url_for_page": lambda p: (
-            f"/browse?page={p}&search={search}" if search else f"/browse?page={p}"
-        ),
+        "url_for_page": build_url,
     }
 
     # Get user downloads if user is logged in
@@ -203,10 +245,14 @@ async def browse(
             "request": request,
             "user": user,
             "releases": releases,
-            "categories": categories,
+            "main_categories": main_categories,
+            "subcategories": subcategories,
+            "current_category": current_category,
             "search": search,
             "category_id": category_id,
             "group_id": group_id,
+            "sort_by": sort_by,
+            "sort_desc": sort_desc,
             "pagination": pagination,
             "user_downloads": user_downloads,
             "messages": get_flash_messages(request),
@@ -311,21 +357,36 @@ async def login_submit(
     """
     Process login form
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Login attempt for user: {login}")
+
     from app.core.security import verify_password
     from app.services.user import get_user_by_username
 
     # Try to find user by email first
     user = await get_user_by_email(db, email=login)
+    if user:
+        logger.info(f"User found by email: {user.username}")
 
     # If not found by email, try by username
     if not user:
         user = await get_user_by_username(db, username=login)
+        if user:
+            logger.info(f"User found by username: {user.username}")
 
-    if not user or not verify_password(password, user.hashed_password):
+    if not user:
+        logger.warning(f"Login failed: User not found for login: {login}")
+        flash_message(request, "Invalid username/email or password", "danger")
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    if not verify_password(password, user.hashed_password):
+        logger.warning(f"Login failed: Invalid password for user: {user.username}")
         flash_message(request, "Invalid username/email or password", "danger")
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     if not user.is_active:
+        logger.warning(f"Login failed: User is inactive: {user.username}")
         flash_message(request, "Your account is inactive", "danger")
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -333,14 +394,24 @@ async def login_submit(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     if remember:
         access_token_expires = timedelta(days=30)  # Longer expiration for "remember me"
+        logger.info(f"Remember me enabled for user: {user.username}")
 
     access_token = create_access_token(user.id, expires_delta=access_token_expires)
     request.session["access_token"] = access_token
+    logger.info(f"Access token created and stored in session for user: {user.username}")
 
     # Update last login time
     user.last_login = datetime.utcnow()
     db.add(user)
     await db.commit()
+    logger.info(f"Last login time updated for user: {user.username}")
+
+    # Check if session contains the access token
+    session_token = request.session.get("access_token")
+    if session_token:
+        logger.info(f"Session contains access token for user: {user.username}")
+    else:
+        logger.warning(f"Session does not contain access token for user: {user.username}")
 
     flash_message(request, f"Welcome back, {user.username}!", "success")
     return RedirectResponse(url="/browse", status_code=status.HTTP_303_SEE_OTHER)

@@ -4,6 +4,9 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import AnyHttpUrl, PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Version information
+VERSION = "0.8.0"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
