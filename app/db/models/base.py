@@ -1,8 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import Column, DateTime, Integer
 from sqlalchemy.ext.declarative import as_declarative, declared_attr
+
+
+def _utc_now():
+    """Helper function to get timezone-aware UTC datetime"""
+    return datetime.now(timezone.utc)
 
 
 @as_declarative()
@@ -21,7 +26,7 @@ class Base:
 
     # Common columns for all models
     id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
     updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=_utc_now, onupdate=_utc_now, nullable=False
     )
