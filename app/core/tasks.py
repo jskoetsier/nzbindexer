@@ -223,10 +223,25 @@ async def backfill_group(group_id: int) -> None:
                 # Process backfill articles
                 from app.services.article import process_group_backfill
 
-                await process_group_backfill(db, group, nntp_service=nntp_service)
+                try:
+                    result = await process_group_backfill(
+                        db, group, nntp_service=nntp_service
+                    )
+                    logger.info(f"Backfill completed for {group.name}: {result}")
+                except Exception as backfill_error:
+                    import traceback
+
+                    logger.error(
+                        f"Error calling process_group_backfill for {group.name}: {str(backfill_error)}"
+                    )
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    raise
 
             except Exception as e:
+                import traceback
+
                 logger.error(f"Error backfilling group {group.name}: {str(e)}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
 
     except Exception as e:
         logger.error(f"Error in backfill_group task for group {group_id}: {str(e)}")
