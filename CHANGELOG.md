@@ -5,6 +5,34 @@ All notable changes to the NZB Indexer project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2025-01-14
+
+### Added
+- Full Docker and Podman containerization support with docker-compose.yml
+- PostgreSQL 16 and Redis 7 services in container orchestration
+- Comprehensive .dockerignore for optimized container builds
+- .env.example template for easy configuration
+- Health checks for all containerized services
+- Named volumes for persistent data (postgres_data, redis_data, nzb_data, app_data, app_logs)
+- Detailed podman-compose and docker-compose documentation in README
+
+### Changed
+- **BREAKING**: Application now designed to run exclusively in containerized environment
+- Updated all Python dependencies to latest stable versions (FastAPI 0.115.0, SQLAlchemy 2.0.36, Pydantic 2.10.0, etc.)
+- Replaced deprecated `datetime.utcnow()` with timezone-aware `datetime.now(timezone.utc)` throughout codebase
+- Migrated from deprecated FastAPI `@app.on_event` decorators to modern `lifespan` context manager
+- Updated Python requirement from 3.8+ to 3.9+ for better timezone support
+- Updated README with containerization-first approach
+
+### Fixed
+- All deprecation warnings related to datetime usage (Python 3.12+ compatibility)
+- FastAPI startup/shutdown event deprecation warnings
+- Improved timezone handling across all services
+
+### Security
+- Updated all dependencies with latest security patches
+- Enhanced container security with minimal base image and proper volume permissions
+
 ## [0.8.0] - 2025-06-10
 
 ### Added

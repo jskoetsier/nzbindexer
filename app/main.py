@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Modern Usenet Indexer with FastAPI",
-    version="0.7.0",
+    version="0.9.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
 )
@@ -1204,7 +1204,7 @@ async def health_check():
     """
     Health check endpoint
     """
-    return {"status": "ok", "version": "0.7.0"}
+    return {"status": "ok", "version": "0.9.0"}
 
 
 if __name__ == "__main__":
