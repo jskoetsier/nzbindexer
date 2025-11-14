@@ -87,7 +87,9 @@ class ArticleService:
                         resp, articles = conn.over(f"{current_id}-{batch_end}")
                     except Exception as e:
                         # If OVER command fails, try using HEAD command for each article
-                        logger.warning(f"OVER command failed: {str(e)}. Falling back to HEAD command.")
+                        logger.warning(
+                            f"OVER command failed: {str(e)}. Falling back to HEAD command."
+                        )
                         articles = []
                         for article_id in range(current_id, batch_end + 1):
                             try:
@@ -101,17 +103,35 @@ class ArticleService:
 
                                 # Parse headers
                                 for line in article_info.lines:
-                                    line_str = line.decode() if isinstance(line, bytes) else line
+                                    line_str = (
+                                        line.decode()
+                                        if isinstance(line, bytes)
+                                        else line
+                                    )
                                     if line_str.startswith("Subject:"):
                                         subject = line_str[8:].strip()
                                     elif line_str.startswith("Message-ID:"):
                                         message_id = line_str[10:].strip()
 
                                 if subject and message_id:
-                                    articles.append((article_num, subject, None, None, message_id, None, 0, 0, {}))
+                                    articles.append(
+                                        (
+                                            article_num,
+                                            subject,
+                                            None,
+                                            None,
+                                            message_id,
+                                            None,
+                                            0,
+                                            0,
+                                            {},
+                                        )
+                                    )
                             except Exception as article_e:
                                 # Skip articles that can't be retrieved
-                                logger.debug(f"Skipping article {article_id}: {str(article_e)}")
+                                logger.debug(
+                                    f"Skipping article {article_id}: {str(article_e)}"
+                                )
                                 continue
 
                     # Process each article
@@ -157,28 +177,37 @@ class ArticleService:
                             # Decode bytes to strings with error handling
                             try:
                                 subject = (
-                                    subject.decode('utf-8', errors='replace')
+                                    subject.decode("utf-8", errors="replace")
                                     if isinstance(subject, bytes)
                                     else subject
                                 )
                                 # Replace any surrogate characters that might cause encoding issues
-                                subject = ''.join(c if ord(c) < 0xD800 or ord(c) > 0xDFFF else '?' for c in subject)
+                                subject = "".join(
+                                    c if ord(c) < 0xD800 or ord(c) > 0xDFFF else "?"
+                                    for c in subject
+                                )
                             except Exception:
                                 subject = "Unknown Subject"
 
                             try:
                                 message_id = (
-                                    message_id.decode('utf-8', errors='replace')
+                                    message_id.decode("utf-8", errors="replace")
                                     if isinstance(message_id, bytes)
                                     else message_id
                                 )
                                 # Replace any surrogate characters that might cause encoding issues
-                                message_id = ''.join(c if ord(c) < 0xD800 or ord(c) > 0xDFFF else '?' for c in message_id)
+                                message_id = "".join(
+                                    c if ord(c) < 0xD800 or ord(c) > 0xDFFF else "?"
+                                    for c in message_id
+                                )
                             except Exception:
                                 message_id = f"unknown-{article_num}@placeholder.nzb"
 
                             # Log the subject for debugging
-                            logger.debug(f"Processing article {article_num}: {subject}")
+                            if stats["processed"] % 100 == 0:  # Log every 100th article
+                                logger.info(
+                                    f"Sample subject at article {article_num}: {subject}"
+                                )
 
                             # Process binary post
                             binary_result = await self._process_binary_post(
@@ -190,7 +219,9 @@ class ArticleService:
                             )
 
                             if binary_result:
-                                logger.info(f"Found binary post: {subject} -> {binary_result}")
+                                logger.info(
+                                    f"Found binary post: {subject} -> {binary_result}"
+                                )
 
                             stats["processed"] += 1
 
@@ -258,7 +289,7 @@ class ArticleService:
             # For obfuscated posts, we need to get the article content to check for yEnc headers
             try:
                 # Connect to NNTP server if needed
-                if not hasattr(self, '_conn') or self._conn is None:
+                if not hasattr(self, "_conn") or self._conn is None:
                     self._conn = self.nntp_service.connect()
 
                 # Get the article content
@@ -273,10 +304,14 @@ class ArticleService:
                             article_num_match = re.search(r"(\d+)", message_id)
                             if article_num_match:
                                 article_num = article_num_match.group(1)
-                                logger.debug(f"Trying to get article by number: {article_num}")
+                                logger.debug(
+                                    f"Trying to get article by number: {article_num}"
+                                )
                                 resp, article_info = self._conn.article(article_num)
                             else:
-                                raise Exception("Could not extract article number from message ID")
+                                raise Exception(
+                                    "Could not extract article number from message ID"
+                                )
                         except Exception as article_num_error:
                             # Re-raise the original error
                             raise msg_id_error
@@ -287,7 +322,11 @@ class ArticleService:
                     yenc_name = None
 
                     for line in article_info.lines[:30]:  # Check first 30 lines
-                        line_str = line.decode('utf-8', errors='replace') if isinstance(line, bytes) else line
+                        line_str = (
+                            line.decode("utf-8", errors="replace")
+                            if isinstance(line, bytes)
+                            else line
+                        )
 
                         # Check for yEnc begin line
                         if line_str.startswith("=ybegin "):
@@ -295,11 +334,15 @@ class ArticleService:
                             logger.debug(f"Found yEnc begin line: {yenc_begin}")
 
                             # Extract part info
-                            part_match = re.search(r"part=(\d+)\s+total=(\d+)", line_str)
+                            part_match = re.search(
+                                r"part=(\d+)\s+total=(\d+)", line_str
+                            )
                             if part_match:
                                 part_num = int(part_match.group(1))
                                 total_parts = int(part_match.group(2))
-                                logger.debug(f"Extracted part info: part_num={part_num}, total_parts={total_parts}")
+                                logger.debug(
+                                    f"Extracted part info: part_num={part_num}, total_parts={total_parts}"
+                                )
 
                             # Extract name
                             name_match = re.search(r"name=(.*?)$", line_str)
@@ -319,11 +362,15 @@ class ArticleService:
                     # If we found yEnc headers, use the name from the yEnc header as the binary name
                     if yenc_name and part_num and total_parts:
                         binary_name = yenc_name
-                        logger.info(f"Found obfuscated binary post: {subject} -> {binary_name} (part {part_num}/{total_parts})")
+                        logger.info(
+                            f"Found obfuscated binary post: {subject} -> {binary_name} (part {part_num}/{total_parts})"
+                        )
                     elif yenc_name and part_num:
                         binary_name = yenc_name
                         total_parts = 1  # Assume single part if total not specified
-                        logger.info(f"Found obfuscated binary post with unknown total parts: {subject} -> {binary_name} (part {part_num})")
+                        logger.info(
+                            f"Found obfuscated binary post with unknown total parts: {subject} -> {binary_name} (part {part_num})"
+                        )
                     elif is_likely_binary:
                         # If we think it's a binary post but couldn't extract all info, try to use what we have
                         if not binary_name and yenc_name:
@@ -332,7 +379,9 @@ class ArticleService:
                             part_num = 1  # Assume part 1 if not specified
                         if not total_parts:
                             total_parts = 1  # Assume single part if not specified
-                        logger.info(f"Reconstructed binary post info: {subject} -> {binary_name} (part {part_num}/{total_parts})")
+                        logger.info(
+                            f"Reconstructed binary post info: {subject} -> {binary_name} (part {part_num}/{total_parts})"
+                        )
 
                 except Exception as e:
                     logger.debug(f"Error getting article content: {str(e)}")
@@ -342,6 +391,9 @@ class ArticleService:
 
         # If we still couldn't extract binary info, skip this post
         if not binary_name or not part_num:
+            logger.debug(
+                f"Skipping article - could not extract binary info from subject: {subject}"
+            )
             return
 
         # Create or update binary entry
@@ -549,29 +601,33 @@ class ArticleService:
                 # Check if we should create a release for this binary
                 create_release_conditions = [
                     # Condition 1: Binary is complete (all parts available)
-                    binary["total_parts"] > 0 and len(binary["parts"]) >= binary["total_parts"],
-
+                    binary["total_parts"] > 0
+                    and len(binary["parts"]) >= binary["total_parts"],
                     # Condition 2: Binary has at least 1 part and we don't know the total parts
                     binary["total_parts"] == 0 and len(binary["parts"]) >= 1,
-
                     # Condition 3: Binary has at least 25% of parts and at least 2 parts (more relaxed)
-                    binary["total_parts"] > 0 and len(binary["parts"]) >= max(2, binary["total_parts"] // 4),
-
+                    binary["total_parts"] > 0
+                    and len(binary["parts"]) >= max(2, binary["total_parts"] // 4),
                     # Condition 4: Binary has at least 5 parts (for large binaries)
-                    len(binary["parts"]) >= 5
+                    len(binary["parts"]) >= 5,
                 ]
 
                 logger.info(f"Binary: {binary['name']}")
                 logger.info(f"  Parts: {len(binary['parts'])}/{binary['total_parts']}")
                 logger.info(f"  Size: {binary['size']}")
                 logger.info(f"  Create release conditions: {create_release_conditions}")
-                logger.info(f"  Should create release: {any(create_release_conditions)}")
+                logger.info(
+                    f"  Should create release: {any(create_release_conditions)}"
+                )
 
                 if any(create_release_conditions):
                     # Calculate completion percentage
                     completion = 100.0
                     if binary["total_parts"] > 0:
-                        completion = min(100.0, (len(binary["parts"]) / binary["total_parts"]) * 100.0)
+                        completion = min(
+                            100.0,
+                            (len(binary["parts"]) / binary["total_parts"]) * 100.0,
+                        )
 
                     # Check if release already exists
                     from app.services.release import create_release_guid
@@ -590,12 +646,16 @@ class ArticleService:
                             existing_release.completion = completion
                             db.add(existing_release)
                             await db.commit()
-                            logger.info(f"Updated release {existing_release.id} with more parts: {len(binary['parts'])}")
+                            logger.info(
+                                f"Updated release {existing_release.id} with more parts: {len(binary['parts'])}"
+                            )
                         continue
 
                     # Create new release
                     subject = binary_subjects.get(binary_key, binary["name"])
-                    logger.info(f"Creating release for binary: {binary['name']} with {len(binary['parts'])}/{binary['total_parts']} parts")
+                    logger.info(
+                        f"Creating release for binary: {binary['name']} with {len(binary['parts'])}/{binary['total_parts']} parts"
+                    )
 
                     from app.schemas.release import ReleaseCreate
 
@@ -609,7 +669,9 @@ class ArticleService:
                         size=binary["size"],
                         files=len(binary["parts"]),
                         completion=completion,
-                        posted_date=datetime.now(timezone.utc),  # Should use article date
+                        posted_date=datetime.now(
+                            timezone.utc
+                        ),  # Should use article date
                         status=1,  # Active
                         passworded=0,  # Unknown
                         category_id=default_category.id,
@@ -620,13 +682,18 @@ class ArticleService:
 
                     # Generate NZB file for the release
                     from app.services.nzb import NZBService
+
                     nzb_service = NZBService(nntp_service=self.nntp_service)
                     nzb_path = await nzb_service.generate_nzb(db, release.id)
 
                     if nzb_path:
-                        logger.info(f"Generated NZB file for release {release.id}: {nzb_path}")
+                        logger.info(
+                            f"Generated NZB file for release {release.id}: {nzb_path}"
+                        )
                     else:
-                        logger.warning(f"Failed to generate NZB file for release {release.id}")
+                        logger.warning(
+                            f"Failed to generate NZB file for release {release.id}"
+                        )
 
                     releases_created += 1
 
@@ -725,8 +792,17 @@ async def process_group_backfill(
 
     # Ensure backfill_target is valid
     if group.backfill_target <= 0:
-        logger.warning(f"Invalid backfill target for group {group.name}: {group.backfill_target}")
-        return {"processed": 0, "total": 0, "skipped": 0, "failed": 0, "binaries": 0, "releases": 0}
+        logger.warning(
+            f"Invalid backfill target for group {group.name}: {group.backfill_target}"
+        )
+        return {
+            "processed": 0,
+            "total": 0,
+            "skipped": 0,
+            "failed": 0,
+            "binaries": 0,
+            "releases": 0,
+        }
 
     # Determine the range of articles to process
     start_id = group.backfill_target
@@ -734,7 +810,9 @@ async def process_group_backfill(
 
     # If backfill_target is greater than current_article_id, we need to fix this
     if start_id >= end_id:
-        logger.warning(f"Backfill target {start_id} is greater than or equal to current article ID {end_id} for group {group.name}")
+        logger.warning(
+            f"Backfill target {start_id} is greater than or equal to current article ID {end_id} for group {group.name}"
+        )
 
         # Get the actual first and last article IDs from the server
         try:
@@ -742,12 +820,16 @@ async def process_group_backfill(
             resp, count, first, last, name = conn.group(group.name)
             conn.quit()
 
-            logger.info(f"Group {group.name} has article range {first}-{last} on server")
+            logger.info(
+                f"Group {group.name} has article range {first}-{last} on server"
+            )
 
             # Update the group's article IDs in the database
             group.first_article_id = first
             group.last_article_id = last
-            group.current_article_id = last  # Set current to last to start from the most recent
+            group.current_article_id = (
+                last  # Set current to last to start from the most recent
+            )
 
             # Set backfill target to a reasonable value (e.g., 1000 articles back from last)
             backfill_amount = min(1000, (last - first) // 2)
@@ -760,7 +842,9 @@ async def process_group_backfill(
             start_id = group.backfill_target
             end_id = group.current_article_id - 1
 
-            logger.info(f"Updated group article IDs: first={first}, last={last}, current={group.current_article_id}, backfill_target={group.backfill_target}")
+            logger.info(
+                f"Updated group article IDs: first={first}, last={last}, current={group.current_article_id}, backfill_target={group.backfill_target}"
+            )
             logger.info(f"New backfill range: {start_id}-{end_id}")
 
         except Exception as e:
@@ -768,14 +852,16 @@ async def process_group_backfill(
             # Fallback to the old behavior
             end_id = start_id
             start_id = max(1, start_id - limit)
-            logger.info(f"Adjusted backfill range to {start_id}-{end_id} for group {group.name}")
+            logger.info(
+                f"Adjusted backfill range to {start_id}-{end_id} for group {group.name}"
+            )
 
     # Process articles from backfill_target to current_article_id
-    logger.info(f"Processing articles for {group.name} from {start_id} to {end_id} (range: {end_id - start_id + 1} articles)")
-    stats = await article_service.process_articles(
-        db, group, start_id, end_id, limit
+    logger.info(
+        f"Processing articles for {group.name} from {start_id} to {end_id} (range: {end_id - start_id + 1} articles)"
     )
-    
+    stats = await article_service.process_articles(db, group, start_id, end_id, limit)
+
     logger.info(
         f"Backfill stats for {group.name}: processed={stats['processed']}, binaries={stats.get('binaries', 0)}, releases={stats.get('releases', 0)}, skipped={stats.get('skipped', 0)}, failed={stats.get('failed', 0)}"
     )
@@ -787,8 +873,12 @@ async def process_group_backfill(
         group.last_updated = datetime.now(timezone.utc)
         db.add(group)
         await db.commit()
-        logger.info(f"Updated backfill target to {group.backfill_target} for group {group.name}")
+        logger.info(
+            f"Updated backfill target to {group.backfill_target} for group {group.name}"
+        )
     else:
-        logger.warning(f"No articles processed for {group.name} in range {start_id}-{end_id}")
+        logger.warning(
+            f"No articles processed for {group.name} in range {start_id}-{end_id}"
+        )
 
     return stats
