@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL Database
   db:
-    image: postgres:16-alpine
+    image: docker.io/library/postgres:16-alpine
     container_name: nzbindexer-db
     restart: unless-stopped
     environment:
@@ -22,7 +22,7 @@ services:
 
   # Redis (optional, for future caching/background tasks)
   redis:
-    image: redis:7-alpine
+    image: docker.io/library/redis:7-alpine
     container_name: nzbindexer-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
