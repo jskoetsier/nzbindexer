@@ -43,8 +43,8 @@ fi
 
 print_info "Using container runtime: $COMPOSE_CMD"
 
-# Generate secret key
-SECRET_KEY=$(openssl rand -base64 32 2>/dev/null || date +%s | sha256sum | base64 | head -c 32)
+# Generate secret key (limit to reasonable length for bcrypt)
+SECRET_KEY=$(openssl rand -base64 32 2>/dev/null || date +%s | sha256sum | base64 | head -c 32 | head -c 50)
 
 # Create .env file
 print_info "Creating .env configuration..."
