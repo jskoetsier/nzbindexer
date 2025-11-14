@@ -75,9 +75,9 @@ async def update_group(group_id: int) -> None:
                 group.last_article_id = group_info["last"]
                 group.last_updated = datetime.now(timezone.utc)
 
-                # If current_article_id is 0, set it to first_article_id
+                # If current_article_id is 0, set it to last_article_id to start from recent articles
                 if group.current_article_id == 0:
-                    group.current_article_id = group_info["first"]
+                    group.current_article_id = group_info["last"]
 
                 # Save changes
                 db.add(group)
@@ -144,16 +144,30 @@ async def backfill_group(group_id: int) -> None:
             try:
                 group_info = nntp_service.get_group_info(group.name)
 
-                # Calculate backfill target if not set
-                if group.backfill_target == 0:
+                # Calculate backfill target if not set or invalid
+                if (
+                    group.backfill_target == 0
+                    or group.backfill_target >= group.current_article_id
+                ):
                     # Calculate target based on backfill days
-                    # This is a simplified calculation and might need adjustment
-                    articles_per_day = (
-                        group_info["last"] - group_info["first"]
-                    ) / app_settings.retention_days
-                    target_articles = int(articles_per_day * app_settings.backfill_days)
+                    # Default to backfilling 10,000 articles if calculation fails
+                    try:
+                        articles_per_day = (
+                            group_info["last"] - group_info["first"]
+                        ) / max(1, app_settings.retention_days)
+                        target_articles = int(
+                            articles_per_day * app_settings.backfill_days
+                        )
+                        # Ensure we have a reasonable backfill amount (at least 1000, at most 100000)
+                        target_articles = max(1000, min(100000, target_articles))
+                    except:
+                        target_articles = 10000
+
                     group.backfill_target = max(
-                        group_info["first"], group_info["last"] - target_articles
+                        group_info["first"], group.current_article_id - target_articles
+                    )
+                    logger.info(
+                        f"Set backfill target for {group.name} to {group.backfill_target} (backfilling {target_articles} articles)"
                     )
 
                 # Update group with new info
