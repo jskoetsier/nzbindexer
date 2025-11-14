@@ -35,7 +35,7 @@ class User(Base):
     api_key = Column(String(32), unique=True, index=True, nullable=True)
     api_requests = Column(Integer, default=0, nullable=False)
     api_requests_today = Column(Integer, default=0, nullable=False)
-    api_requests_reset = Column(DateTime, default=_utc_now, nullable=False)
+    api_requests_reset = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
 
     # User preferences
     theme = Column(String(50), default="default", nullable=False)
@@ -43,8 +43,8 @@ class User(Base):
 
     # User statistics
     grabs = Column(Integer, default=0, nullable=False)
-    last_login = Column(DateTime, nullable=True)
-    last_browse = Column(DateTime, nullable=True)
+    last_login = Column(DateTime(timezone=True), nullable=True)
+    last_browse = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     # releases = relationship("Release", back_populates="user")

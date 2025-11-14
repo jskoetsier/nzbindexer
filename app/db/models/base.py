@@ -24,9 +24,9 @@ class Base:
     def __tablename__(cls) -> str:
         return cls.__name__.lower()
 
-    # Common columns for all models
+    # Common columns for all models - use timezone=True for PostgreSQL TIMESTAMP WITH TIME ZONE
     id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
     updated_at = Column(
-        DateTime, default=_utc_now, onupdate=_utc_now, nullable=False
+        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now, nullable=False
     )
