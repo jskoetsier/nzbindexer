@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from app.db.models.setting import Setting
 from app.schemas.setting import AppSettings, SettingCreate, SettingUpdate
