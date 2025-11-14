@@ -144,37 +144,62 @@ async def backfill_group(group_id: int) -> None:
             try:
                 group_info = nntp_service.get_group_info(group.name)
 
-                # Calculate backfill target if not set or invalid
-                # Invalid cases: target is 0, >= current_article_id, or too far back (>200k articles)
+                # Calculate backfill target based on days instead of article count
+                # This is more intuitive and reliable than trying to estimate article counts
                 backfill_distance = group.current_article_id - group.backfill_target
-                logger.info(
-                    f"Backfill validation for {group.name}: current={group.current_article_id}, target={group.backfill_target}, distance={backfill_distance}"
-                )
 
-                if (
+                # Always recalculate backfill target based on backfill_days setting
+                # Invalid cases that need recalculation:
+                # 1. target is 0 (never set)
+                # 2. target >= current_article_id (invalid)
+                # 3. distance > 200k articles (unreasonably large backfill)
+                should_recalculate = (
                     group.backfill_target == 0
                     or group.backfill_target >= group.current_article_id
                     or backfill_distance > 200000
-                ):
-                    # Calculate target based on backfill days
-                    # Default to backfilling 10,000 articles if calculation fails
+                )
+
+                if should_recalculate:
+                    logger.info(
+                        f"Backfill recalculation needed for {group.name}: current={group.current_article_id}, target={group.backfill_target}, distance={backfill_distance}"
+                    )
+
+                    # Calculate target based on estimated articles per day
+                    # Use retention period to estimate posting rate
                     try:
-                        articles_per_day = (
-                            group_info["last"] - group_info["first"]
-                        ) / max(1, app_settings.retention_days)
+                        total_articles = group_info["last"] - group_info["first"]
+                        articles_per_day = total_articles / max(
+                            1, app_settings.retention_days
+                        )
+
+                        # Calculate how many articles to backfill based on backfill_days
                         target_articles = int(
                             articles_per_day * app_settings.backfill_days
                         )
-                        # Ensure we have a reasonable backfill amount (at least 1000, at most 100000)
-                        target_articles = max(1000, min(100000, target_articles))
-                    except:
-                        target_articles = 10000
 
+                        # Apply reasonable limits to prevent extreme values
+                        # Min: 1000 articles (at least some content)
+                        # Max: 100000 articles (prevent overwhelming the system)
+                        target_articles = max(1000, min(100000, target_articles))
+
+                        logger.info(
+                            f"Calculated backfill for {group.name}: {articles_per_day:.0f} articles/day * {app_settings.backfill_days} days = {target_articles} articles"
+                        )
+                    except Exception as e:
+                        # Fallback to 10,000 articles if calculation fails
+                        target_articles = 10000
+                        logger.warning(
+                            f"Failed to calculate backfill for {group.name}, using default {target_articles} articles: {e}"
+                        )
+
+                    # Set backfill_target to go back 'target_articles' from current position
+                    # Ensure we don't go below the first article in the group
                     group.backfill_target = max(
                         group_info["first"], group.current_article_id - target_articles
                     )
+
                     logger.info(
-                        f"Set backfill target for {group.name} to {group.backfill_target} (backfilling {target_articles} articles from current {group.current_article_id})"
+                        f"Set backfill target for {group.name} to {group.backfill_target} (backfilling ~{app_settings.backfill_days} days / {target_articles} articles from current {group.current_article_id})"
                     )
 
                 # Update group with new info
