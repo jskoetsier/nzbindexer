@@ -771,8 +771,13 @@ async def process_group_backfill(
             logger.info(f"Adjusted backfill range to {start_id}-{end_id} for group {group.name}")
 
     # Process articles from backfill_target to current_article_id
+    logger.info(f"Processing articles for {group.name} from {start_id} to {end_id} (range: {end_id - start_id + 1} articles)")
     stats = await article_service.process_articles(
         db, group, start_id, end_id, limit
+    )
+    
+    logger.info(
+        f"Backfill stats for {group.name}: processed={stats['processed']}, binaries={stats.get('binaries', 0)}, releases={stats.get('releases', 0)}, skipped={stats.get('skipped', 0)}, failed={stats.get('failed', 0)}"
     )
 
     # Update group's backfill_target if we processed some articles
@@ -783,5 +788,7 @@ async def process_group_backfill(
         db.add(group)
         await db.commit()
         logger.info(f"Updated backfill target to {group.backfill_target} for group {group.name}")
+    else:
+        logger.warning(f"No articles processed for {group.name} in range {start_id}-{end_id}")
 
     return stats
