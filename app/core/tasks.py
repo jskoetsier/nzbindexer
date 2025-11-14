@@ -147,6 +147,10 @@ async def backfill_group(group_id: int) -> None:
                 # Calculate backfill target if not set or invalid
                 # Invalid cases: target is 0, >= current_article_id, or too far back (>200k articles)
                 backfill_distance = group.current_article_id - group.backfill_target
+                logger.info(
+                    f"Backfill validation for {group.name}: current={group.current_article_id}, target={group.backfill_target}, distance={backfill_distance}"
+                )
+
                 if (
                     group.backfill_target == 0
                     or group.backfill_target >= group.current_article_id
