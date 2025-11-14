@@ -6,7 +6,7 @@ import hashlib
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from app.core.config import settings
 from app.db.models.release import Release
