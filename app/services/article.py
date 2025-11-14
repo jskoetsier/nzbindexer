@@ -269,6 +269,7 @@ class ArticleService:
     ) -> None:
         """
         Process a binary post from a newsgroup
+        Enhanced to handle obfuscated posts efficiently
         """
         # Ensure subject is not None
         if subject is None:
@@ -277,124 +278,54 @@ class ArticleService:
         # First, try to parse subject to extract binary name and part info
         binary_name, part_num, total_parts = self._parse_binary_subject(subject)
 
-        # Check if this is likely a binary post by looking for yEnc in the subject
-        is_likely_binary = False
-        if "yenc" in subject.lower() or "yEnc" in subject:
-            is_likely_binary = True
-            logger.debug(f"Likely binary post (yEnc in subject): {subject}")
-
-        # If we couldn't extract binary info from the subject, check if this is an obfuscated binary post
-        # by looking for yEnc headers in the article content
-        if not binary_name or not part_num:
-            # For obfuscated posts, we need to get the article content to check for yEnc headers
-            try:
-                # Connect to NNTP server if needed
-                if not hasattr(self, "_conn") or self._conn is None:
-                    self._conn = self.nntp_service.connect()
-
-                # Get the article content
-                try:
-                    # Try to get the article by message ID first
-                    try:
-                        resp, article_info = self._conn.article(f"<{message_id}>")
-                    except Exception as msg_id_error:
-                        # If that fails, try by article number
-                        try:
-                            # Extract article number from message ID if possible
-                            article_num_match = re.search(r"(\d+)", message_id)
-                            if article_num_match:
-                                article_num = article_num_match.group(1)
-                                logger.debug(
-                                    f"Trying to get article by number: {article_num}"
-                                )
-                                resp, article_info = self._conn.article(article_num)
-                            else:
-                                raise Exception(
-                                    "Could not extract article number from message ID"
-                                )
-                        except Exception as article_num_error:
-                            # Re-raise the original error
-                            raise msg_id_error
-
-                    # Look for yEnc headers in the article content
-                    yenc_begin = None
-                    yenc_part = None
-                    yenc_name = None
-
-                    for line in article_info.lines[:30]:  # Check first 30 lines
-                        line_str = (
-                            line.decode("utf-8", errors="replace")
-                            if isinstance(line, bytes)
-                            else line
-                        )
-
-                        # Check for yEnc begin line
-                        if line_str.startswith("=ybegin "):
-                            yenc_begin = line_str
-                            logger.debug(f"Found yEnc begin line: {yenc_begin}")
-
-                            # Extract part info
-                            part_match = re.search(
-                                r"part=(\d+)\s+total=(\d+)", line_str
-                            )
-                            if part_match:
-                                part_num = int(part_match.group(1))
-                                total_parts = int(part_match.group(2))
-                                logger.debug(
-                                    f"Extracted part info: part_num={part_num}, total_parts={total_parts}"
-                                )
-
-                            # Extract name
-                            name_match = re.search(r"name=(.*?)$", line_str)
-                            if name_match:
-                                yenc_name = name_match.group(1).strip()
-                                logger.debug(f"Extracted name: {yenc_name}")
-
-                        # Check for yEnc part line
-                        elif line_str.startswith("=ypart "):
-                            yenc_part = line_str
-                            logger.debug(f"Found yEnc part line: {yenc_part}")
-
-                        # If we found both yEnc begin and part lines, we can stop
-                        if yenc_begin and (yenc_part or part_match) and yenc_name:
-                            break
-
-                    # If we found yEnc headers, use the name from the yEnc header as the binary name
-                    if yenc_name and part_num and total_parts:
-                        binary_name = yenc_name
-                        logger.info(
-                            f"Found obfuscated binary post: {subject} -> {binary_name} (part {part_num}/{total_parts})"
-                        )
-                    elif yenc_name and part_num:
-                        binary_name = yenc_name
-                        total_parts = 1  # Assume single part if total not specified
-                        logger.info(
-                            f"Found obfuscated binary post with unknown total parts: {subject} -> {binary_name} (part {part_num})"
-                        )
-                    elif is_likely_binary:
-                        # If we think it's a binary post but couldn't extract all info, try to use what we have
-                        if not binary_name and yenc_name:
-                            binary_name = yenc_name
-                        if not part_num:
-                            part_num = 1  # Assume part 1 if not specified
-                        if not total_parts:
-                            total_parts = 1  # Assume single part if not specified
-                        logger.info(
-                            f"Reconstructed binary post info: {subject} -> {binary_name} (part {part_num}/{total_parts})"
-                        )
-
-                except Exception as e:
-                    logger.debug(f"Error getting article content: {str(e)}")
-
-            except Exception as e:
-                logger.debug(f"Error checking for obfuscated binary post: {str(e)}")
-
-        # If we still couldn't extract binary info, skip this post
-        if not binary_name or not part_num:
+        # If subject parsing succeeded, we have a clean/traditional post
+        if binary_name and part_num:
             logger.debug(
-                f"Skipping article - could not extract binary info from subject: {subject}"
+                f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}"
             )
-            return
+        else:
+            # Subject parsing failed - this is likely an obfuscated post
+            # For obfuscated posts, we'll use the subject itself as a placeholder
+            # and rely on yEnc headers in the article body
+
+            # Check if this looks like a binary post at all
+            has_binary_indicators = any(
+                [
+                    "yenc" in subject.lower(),
+                    "yEnc" in subject,
+                    re.search(r"\[\d+/\d+\]", subject),  # Has part indicator
+                    re.search(r"\(\d+/\d+\)", subject),  # Has part indicator
+                    bytes_count > 10000,  # Large enough to be binary
+                ]
+            )
+
+            if not has_binary_indicators:
+                # Not a binary post, skip silently
+                return
+
+            # This appears to be an obfuscated binary post
+            # Extract part numbers from subject if available
+            part_match = re.search(r"[\[\(](\d+)/(\d+)[\]\)]", subject)
+            if part_match:
+                part_num = int(part_match.group(1))
+                total_parts = int(part_match.group(2))
+            else:
+                # No part info in subject, assume single part for now
+                part_num = 1
+                total_parts = 1
+
+            # For obfuscated posts, use message_id as the binary key initially
+            # We'll update this later when we have the real filename from yEnc headers
+            # Use a hash of the subject line minus the part numbers as the binary name
+            # This groups parts of the same post together
+            subject_base = re.sub(r"[\[\(]\d+/\d+[\]\)]", "", subject).strip()
+            binary_name = (
+                f"obfuscated_{hash(subject_base) & 0x7FFFFFFF}"  # Positive hash
+            )
+
+            logger.debug(
+                f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}"
+            )
 
         # Create or update binary entry
         binary_key = self._get_binary_key(binary_name)
@@ -405,6 +336,10 @@ class ArticleService:
                 "parts": {},
                 "total_parts": total_parts or 0,
                 "size": 0,
+                "obfuscated": binary_name.startswith(
+                    "obfuscated_"
+                ),  # Track if this is obfuscated
+                "message_ids": [],  # Store message IDs for later yEnc header fetching
             }
             binary_subjects[binary_key] = subject
 
@@ -413,8 +348,10 @@ class ArticleService:
             binaries[binary_key]["parts"][part_num] = {
                 "message_id": message_id,
                 "size": bytes_count,
+                "subject": subject,  # Store subject for debugging
             }
             binaries[binary_key]["size"] += bytes_count
+            binaries[binary_key]["message_ids"].append(message_id)
 
         # Update total parts if we have a new value
         if total_parts and binaries[binary_key]["total_parts"] < total_parts:
