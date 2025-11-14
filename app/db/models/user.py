@@ -1,10 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.db.models.base import Base
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
+
+
+def _utc_now():
+    """Helper function to get timezone-aware UTC datetime"""
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -30,7 +35,7 @@ class User(Base):
     api_key = Column(String(32), unique=True, index=True, nullable=True)
     api_requests = Column(Integer, default=0, nullable=False)
     api_requests_today = Column(Integer, default=0, nullable=False)
-    api_requests_reset = Column(DateTime, default=datetime.utcnow, nullable=False)
+    api_requests_reset = Column(DateTime, default=_utc_now, nullable=False)
 
     # User preferences
     theme = Column(String(50), default="default", nullable=False)
