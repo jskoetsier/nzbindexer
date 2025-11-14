@@ -33,28 +33,9 @@ A modern Usenet indexer built with FastAPI, featuring a responsive web interface
 
 ## Installation
 
-### Quick Install
+### Podman/Docker Compose (Recommended)
 
-The easiest way to install NZB Indexer is to use the provided installation script:
-
-```bash
-git clone https://github.com/yourusername/nzbindexer.git
-cd nzbindexer
-chmod +x install.sh
-./install.sh
-```
-
-The script will:
-1. Check for Python 3.8+
-2. Create a virtual environment
-3. Install dependencies
-4. Initialize the database
-5. Create an admin user
-6. Generate a systemd service file
-
-### Manual Installation
-
-If you prefer to install manually:
+The easiest and recommended way to run NZB Indexer is using podman-compose or docker-compose:
 
 1. Clone the repository:
    ```bash
@@ -62,48 +43,73 @@ If you prefer to install manually:
    cd nzbindexer
    ```
 
-2. Create and activate a virtual environment:
+2. Copy the example environment file and configure it:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   cp .env.example .env
    ```
 
-3. Install dependencies:
+   Edit `.env` and set your configuration:
+   - Change `POSTGRES_PASSWORD` to a secure password
+   - Change `SECRET_KEY` to a long random string
+   - Optionally configure NNTP settings (can also be done via web interface)
+
+3. Build and start the containers:
+
+   **Using podman-compose:**
    ```bash
-   pip install -r requirements.txt
+   podman-compose up -d
    ```
 
-4. Initialize the database:
+   **Using docker-compose:**
    ```bash
-   python -m app.db.init_db
+   docker-compose up -d
    ```
 
-5. Create an admin user:
-   ```python
-   from app.db.session import SessionLocal
-   from app.db.models.user import User
-   from app.core.security import get_password_hash
-   import datetime
-
-   db = SessionLocal()
-   admin = User(
-       email='admin@example.com',
-       username='admin',
-       hashed_password=get_password_hash('your_password'),
-       is_active=True,
-       is_admin=True,
-       is_confirmed=True,
-       last_login=datetime.datetime.utcnow()
-   )
-   db.add(admin)
-   db.commit()
-   db.close()
-   ```
-
-6. Run the application:
+4. Initialize the database and create an admin user:
    ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   # For podman-compose:
+   podman-compose exec app python -m app.db.init_db
+
+   # For docker-compose:
+   docker-compose exec app python -m app.db.init_db
    ```
+
+5. Access the application:
+   - Web Interface: http://localhost:8000
+   - API Documentation: http://localhost:8000/api/v1/docs
+   - Default admin credentials will be created during initialization
+
+6. To view logs:
+   ```bash
+   # For podman-compose:
+   podman-compose logs -f app
+
+   # For docker-compose:
+   docker-compose logs -f app
+   ```
+
+7. To stop the application:
+   ```bash
+   # For podman-compose:
+   podman-compose down
+
+   # For docker-compose:
+   docker-compose down
+   ```
+
+### Container Management
+
+The compose file includes three services:
+- **app**: The main NZB Indexer application
+- **db**: PostgreSQL database
+- **redis**: Redis cache (for future features)
+
+All data is persisted in Docker/Podman volumes:
+- `postgres_data`: Database files
+- `redis_data`: Redis persistence
+- `nzb_data`: NZB files
+- `app_data`: Application data
+- `app_logs`: Application logs
 
 ## Configuration
 

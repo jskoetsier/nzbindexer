@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: nzbindexer-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nzbindexer}
+      POSTGRES_USER: ${POSTGRES_USER:-nzbindexer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nzbindexer}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nzbindexer-network
+
+  # Redis (optional, for future caching/background tasks)
+  redis:
+    image: redis:7-alpine
+    container_name: nzbindexer-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nzbindexer-network
+
+  # NZB Indexer Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nzbindexer-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nzbindexer}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-nzbindexer}
+
+      # Application settings
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
+      API_V1_STR: ${API_V1_STR:-/api/v1}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      PROJECT_NAME: ${PROJECT_NAME:-NZB Indexer}
+
+      # NNTP settings (configured via web interface or environment)
+      NNTP_SERVER: ${NNTP_SERVER:-}
+      NNTP_PORT: ${NNTP_PORT:-119}
+      NNTP_SSL: ${NNTP_SSL:-false}
+      NNTP_SSL_PORT: ${NNTP_SSL_PORT:-563}
+      NNTP_USERNAME: ${NNTP_USERNAME:-}
+      NNTP_PASSWORD: ${NNTP_PASSWORD:-}
+
+      # Redis connection
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      # Persist NZB files and data
+      - nzb_data:/app/nzbs
+      - app_data:/app/data
+      - app_logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nzbindexer-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  nzb_data:
+    driver: local
+  app_data:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  nzbindexer-network:
+    driver: bridge
