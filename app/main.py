@@ -41,6 +41,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.sessions import SessionMiddleware
 
+
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -171,12 +172,14 @@ async def browse(
     # Get categories organized by parent/child relationship
     from app.db.models.category import Category
     from app.db.models.release import Release
-    from sqlalchemy import func, select, and_, or_
+    from sqlalchemy import and_, func, or_, select
 
     # Get all categories
     query = (
         select(Category, func.count(Release.id).label("release_count"))
-        .outerjoin(Release, and_(Release.category_id == Category.id, Release.status == 1))
+        .outerjoin(
+            Release, and_(Release.category_id == Category.id, Release.status == 1)
+        )
         .filter(Category.active == True)
         .group_by(Category.id)
         .order_by(Category.sort_order)
@@ -243,8 +246,10 @@ async def browse(
         "pages": (total + per_page - 1) // per_page,
         "has_prev": page > 1,
         "has_next": page < ((total + per_page - 1) // per_page),
-        "prev_url": build_url(page-1) if page > 1 else None,
-        "next_url": build_url(page+1) if page < ((total + per_page - 1) // per_page) else None,
+        "prev_url": build_url(page - 1) if page > 1 else None,
+        "next_url": (
+            build_url(page + 1) if page < ((total + per_page - 1) // per_page) else None
+        ),
         "iter_pages": lambda: range(1, ((total + per_page - 1) // per_page) + 1),
         "url_for_page": build_url,
     }
@@ -374,6 +379,7 @@ async def login_submit(
     Process login form
     """
     import logging
+
     logger = logging.getLogger(__name__)
     logger.info(f"Login attempt for user: {login}")
 
@@ -427,7 +433,9 @@ async def login_submit(
     if session_token:
         logger.info(f"Session contains access token for user: {user.username}")
     else:
-        logger.warning(f"Session does not contain access token for user: {user.username}")
+        logger.warning(
+            f"Session does not contain access token for user: {user.username}"
+        )
 
     flash_message(request, f"Welcome back, {user.username}!", "success")
     return RedirectResponse(url="/browse", status_code=status.HTTP_303_SEE_OTHER)
@@ -1197,6 +1205,80 @@ async def profile_update(
         flash_message(request, f"Error updating profile: {str(e)}", "danger")
 
     return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/api-keys", response_class=HTMLResponse)
+async def api_keys_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    API keys management page
+    """
+    user = await get_current_web_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    return templates.TemplateResponse(
+        "api_keys.html",
+        {
+            "request": request,
+            "user": user,
+            "settings": settings,
+        },
+    )
+
+
+@app.post("/api-keys/generate")
+async def generate_api_key(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate a new API key for the user
+    """
+    user = await get_current_web_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Generate a random API key
+    import secrets
+
+    api_key = secrets.token_urlsafe(24)
+
+    # Update user with new API key
+    user.api_key = api_key
+    db.add(user)
+    await db.commit()
+
+    flash_message(request, "API key generated successfully", "success")
+    return RedirectResponse(url="/api-keys", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/api-keys/regenerate")
+async def regenerate_api_key(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Regenerate API key for the user
+    """
+    user = await get_current_web_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Generate a new random API key
+    import secrets
+
+    api_key = secrets.token_urlsafe(24)
+
+    # Update user with new API key
+    user.api_key = api_key
+    db.add(user)
+    await db.commit()
+
+    flash_message(request, "API key regenerated successfully", "success")
+    return RedirectResponse(url="/api-keys", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/health")
