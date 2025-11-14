@@ -1,10 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.db.models.base import Base
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import relationship
+
+
+def _utc_now():
+    """Helper function to get timezone-aware UTC datetime"""
+    return datetime.now(timezone.utc)
 
 
 class Group(Base):
@@ -31,9 +36,9 @@ class Group(Base):
 
     backfill_target = Column(Integer, default=0, nullable=False)
 
-    # Group processing timestamps
-    last_updated = Column(DateTime, default=datetime.utcnow, nullable=False)
-    last_article_date = Column(DateTime, nullable=True)
+    # Group processing timestamps - use timezone=True for PostgreSQL TIMESTAMP WITH TIME ZONE
+    last_updated = Column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    last_article_date = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     # articles = relationship("Article", back_populates="group")
