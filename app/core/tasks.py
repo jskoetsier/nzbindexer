@@ -145,9 +145,12 @@ async def backfill_group(group_id: int) -> None:
                 group_info = nntp_service.get_group_info(group.name)
 
                 # Calculate backfill target if not set or invalid
+                # Invalid cases: target is 0, >= current_article_id, or too far back (>200k articles)
+                backfill_distance = group.current_article_id - group.backfill_target
                 if (
                     group.backfill_target == 0
                     or group.backfill_target >= group.current_article_id
+                    or backfill_distance > 200000
                 ):
                     # Calculate target based on backfill days
                     # Default to backfilling 10,000 articles if calculation fails
@@ -167,7 +170,7 @@ async def backfill_group(group_id: int) -> None:
                         group_info["first"], group.current_article_id - target_articles
                     )
                     logger.info(
-                        f"Set backfill target for {group.name} to {group.backfill_target} (backfilling {target_articles} articles)"
+                        f"Set backfill target for {group.name} to {group.backfill_target} (backfilling {target_articles} articles from current {group.current_article_id})"
                     )
 
                 # Update group with new info
