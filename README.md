@@ -33,9 +33,28 @@ A modern Usenet indexer built with FastAPI, featuring a responsive web interface
 
 ## Installation
 
-### Podman/Docker Compose (Recommended)
+### Quick Start with Podman (Recommended)
 
-The easiest and recommended way to run NZB Indexer is using podman-compose or docker-compose:
+The fastest way to get NZB Indexer running:
+
+```bash
+git clone https://github.com/yourusername/nzbindexer.git
+cd nzbindexer
+chmod +x install-podman.sh
+./install-podman.sh
+```
+
+The installer will:
+- ✓ Check for podman-compose or docker-compose
+- ✓ Create and configure `.env` file with secure defaults
+- ✓ Build and start all containers
+- ✓ Initialize the database
+- ✓ Create an admin user
+- ✓ Provide access URLs and useful commands
+
+### Manual Podman/Docker Compose Installation
+
+If you prefer manual installation:
 
 1. Clone the repository:
    ```bash
@@ -110,6 +129,58 @@ All data is persisted in Docker/Podman volumes:
 - `nzb_data`: NZB files
 - `app_data`: Application data
 - `app_logs`: Application logs
+
+## Management & Utilities
+
+### Utility Script
+
+The `scripts/utils.sh` script provides common management tasks:
+
+```bash
+# Start containers
+./scripts/utils.sh start
+
+# Stop containers
+./scripts/utils.sh stop
+
+# View logs
+./scripts/utils.sh logs [service]
+
+# Access container shell
+./scripts/utils.sh shell
+
+# Database operations
+./scripts/utils.sh backup
+./scripts/utils.sh restore <backup-file>
+./scripts/utils.sh db-shell
+
+# Application management
+./scripts/utils.sh add-categories
+./scripts/utils.sh test-nntp
+./scripts/utils.sh reset-admin
+
+# Update application
+./scripts/utils.sh update
+
+# View all available commands
+./scripts/utils.sh
+```
+
+### Validation
+
+Test your installation:
+
+```bash
+./scripts/validate.sh
+```
+
+This will check:
+- Required files are present
+- Container runtime is available
+- Containers are running and healthy
+- HTTP endpoints are accessible
+- Configuration is properly set
+- Application structure is intact
 
 ## Configuration
 
