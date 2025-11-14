@@ -12,7 +12,8 @@ itsdangerous>=2.2.0  # For session middleware
 # Database
 sqlalchemy>=2.0.36
 alembic>=1.14.0
-asyncpg>=0.30.0  # PostgreSQL driver
+asyncpg>=0.30.0  # PostgreSQL async driver
+psycopg2-binary>=2.9.9  # PostgreSQL sync driver (needed by alembic)
 aiosqlite>=0.20.0  # SQLite driver
 
 # Authentication and security

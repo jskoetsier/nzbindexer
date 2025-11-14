@@ -116,9 +116,17 @@ def get_database_url() -> str:
     # Check for explicit DATABASE_URL environment variable
     db_url = os.environ.get("DATABASE_URL")
     if db_url:
-        # Handle Heroku-style postgres:// URLs
+        # Handle Heroku-style postgres:// URLs and ensure asyncpg driver
         if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql://", 1)
+            db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif db_url.startswith("postgresql://"):
+            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif not db_url.startswith("postgresql+asyncpg://") and not db_url.startswith(
+            "sqlite"
+        ):
+            # If it's a postgresql URL but doesn't specify the driver, add asyncpg
+            if "postgresql" in db_url:
+                db_url = db_url.replace("postgresql", "postgresql+asyncpg", 1)
         logger.info(f"Using DATABASE_URL from environment: {db_url}")
         return db_url
 
