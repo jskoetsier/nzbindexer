@@ -200,7 +200,7 @@
                                     <tr>
                                         <th>Name</th>
                                         <th>Description</th>
-                                        <th>Backfill Target</th>
+                                        <th>Backfill Days</th>
                                         <th>Current Progress</th>
                                         <th>Actions</th>
                                     </tr>
@@ -210,7 +210,13 @@
                                     <tr>
                                         <td>{{ group.name }}</td>
                                         <td>{{ group.description|truncate(50) if group.description else "No description" }}</td>
-                                        <td>{{ group.backfill_target }}</td>
+                                        <td>
+                                            {% if group.backfill_days > 0 %}
+                                                {{ group.backfill_days }} days
+                                            {% else %}
+                                                <span class="text-muted">Global setting</span>
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             <div class="progress">
                                                 {% set backfill_range = group.backfill_target - group.first_article_id %}
