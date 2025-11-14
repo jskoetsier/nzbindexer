@@ -15,7 +15,8 @@ class GroupBase(BaseModel):
     backfill: Optional[bool] = False
     min_files: Optional[int] = 1
     min_size: Optional[int] = 0
-    backfill_target: Optional[int] = None
+    backfill_days: Optional[int] = None  # Days to backfill (0 = use global setting)
+    backfill_target: Optional[int] = None  # Internal field, usually auto-calculated
 
 
 class GroupCreate(GroupBase):

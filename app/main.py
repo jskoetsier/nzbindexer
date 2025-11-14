@@ -855,7 +855,7 @@ async def admin_update_group(
     backfill: bool = Form(False),
     min_files: int = Form(1),
     min_size: int = Form(0),
-    backfill_target: Optional[int] = Form(None),
+    backfill_days: int = Form(0),
 ):
     """
     Admin update group
@@ -875,10 +875,8 @@ async def admin_update_group(
         backfill=backfill,
         min_files=min_files,
         min_size=min_size,
+        backfill_days=backfill_days,
     )
-
-    if backfill_target is not None:
-        group_in.backfill_target = backfill_target
 
     try:
         updated_group = await update_group(db, group_id, group_in)

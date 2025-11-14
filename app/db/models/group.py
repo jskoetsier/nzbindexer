@@ -28,13 +28,18 @@ class Group(Base):
     # Group processing settings
     min_files = Column(Integer, default=1, nullable=False)
     min_size = Column(Integer, default=0, nullable=False)  # Minimum size in bytes
+    backfill_days = Column(
+        Integer, default=0, nullable=False
+    )  # Days to backfill (0 = use global setting)
 
     # Group statistics
     first_article_id = Column(Integer, default=0, nullable=False)
     last_article_id = Column(Integer, default=0, nullable=False)
     current_article_id = Column(Integer, default=0, nullable=False)
 
-    backfill_target = Column(Integer, default=0, nullable=False)
+    backfill_target = Column(
+        Integer, default=0, nullable=False
+    )  # Internal: calculated from backfill_days
 
     # Group processing timestamps - use timezone=True for PostgreSQL TIMESTAMP WITH TIME ZONE
     last_updated = Column(DateTime(timezone=True), default=_utc_now, nullable=False)

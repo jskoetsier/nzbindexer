@@ -74,9 +74,14 @@
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="backfill_target" class="form-label">Backfill Target Article ID</label>
-                            <input type="number" class="form-control" id="backfill_target" name="backfill_target" value="{{ group.backfill_target if group else 0 }}" min="0">
-                            <div class="form-text">Target article ID for backfilling (0 = no backfill)</div>
+                            <label for="backfill_days" class="form-label">Backfill Days</label>
+                            <input type="number" class="form-control" id="backfill_days" name="backfill_days" value="{{ group.backfill_days if group else 0 }}" min="0" max="365">
+                            <div class="form-text">Number of days to backfill (0 = use global setting of {{ global_backfill_days if global_backfill_days is defined else 3 }} days)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="backfill_target" class="form-label">Calculated Backfill Target (read-only)</label>
+                            <input type="number" class="form-control" id="backfill_target" name="backfill_target_display" value="{{ group.backfill_target if group else 0 }}" readonly>
+                            <div class="form-text">Auto-calculated article ID based on backfill days</div>
                         </div>
                     </div>
 
