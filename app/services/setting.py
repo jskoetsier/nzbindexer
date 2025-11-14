@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from datetime import datetime, timezone
+from typing import Optional
 
 from app.db.models.setting import Setting
 from app.schemas.setting import AppSettings, SettingCreate, SettingUpdate
@@ -49,7 +49,7 @@ async def create_setting(db: AsyncSession, setting_in: SettingCreate) -> Setting
         value=setting_in.value,
         description=setting_in.description,
     )
-    db.add(db_setting)
+    db_setting.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(db_setting)
     return db_setting
@@ -72,7 +72,7 @@ async def update_setting(
     for field, value in update_data.items():
         setattr(db_setting, field, value)
 
-    db_setting.updated_at = datetime.utcnow()
+        db_setting.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_setting)
@@ -92,7 +92,7 @@ async def update_setting_by_key(
         db_setting.value = value
         if description:
             db_setting.description = description
-        db_setting.updated_at = datetime.utcnow()
+        db_setting.updated_at = datetime.now(timezone.utc)
     else:
         # Create new setting
         db_setting = Setting(

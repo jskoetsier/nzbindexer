@@ -5,7 +5,7 @@ Background task manager for NZB Indexer
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 
 from app.core.config import settings
@@ -73,7 +73,7 @@ async def update_group(group_id: int) -> None:
 
                 # Update group with new info
                 group.last_article_id = group_info["last"]
-                group.last_updated = datetime.utcnow()
+                group.last_updated = datetime.now(timezone.utc)
 
                 # If current_article_id is 0, set it to first_article_id
                 if group.current_article_id == 0:
@@ -157,7 +157,7 @@ async def backfill_group(group_id: int) -> None:
                     )
 
                 # Update group with new info
-                group.last_updated = datetime.utcnow()
+                group.last_updated = datetime.now(timezone.utc)
 
                 # Save changes
                 db.add(group)

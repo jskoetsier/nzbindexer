@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.db.models.group import Group
@@ -103,7 +103,7 @@ async def update_group(
     for field, value in update_data.items():
         setattr(db_group, field, value)
 
-    db_group.updated_at = datetime.utcnow()
+    db_group.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_group)
@@ -146,7 +146,7 @@ async def update_group_article_stats(
     if current_article_id is not None:
         db_group.current_article_id = current_article_id
 
-    db_group.last_updated = datetime.utcnow()
+    db_group.last_updated = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_group)
@@ -164,7 +164,7 @@ async def update_group_backfill_target(
         return None
 
     db_group.backfill_target = backfill_target
-    db_group.updated_at = datetime.utcnow()
+    db_group.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_group)

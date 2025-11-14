@@ -27,7 +27,7 @@ A modern Usenet indexer built with FastAPI, featuring a responsive web interface
 
 ## Requirements
 
-- Python 3.8 or higher
+- Python 3.9 or higher
 - PostgreSQL, MySQL, or SQLite
 - Usenet server access
 

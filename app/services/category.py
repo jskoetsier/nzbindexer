@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -169,7 +169,7 @@ async def update_category(
     for field, value in update_data.items():
         setattr(db_category, field, value)
 
-    db_category.updated_at = datetime.utcnow()
+    db_category.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_category)

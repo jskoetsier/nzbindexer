@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -69,7 +69,7 @@ async def create_user(db: AsyncSession, user_in: UserCreate) -> User:
         theme=user_in.theme,
         items_per_page=user_in.items_per_page,
     )
-    db.add(db_user)
+    db_user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(db_user)
     return db_user
@@ -97,7 +97,7 @@ async def update_user(
     for field, value in update_data.items():
         setattr(db_user, field, value)
 
-    db_user.updated_at = datetime.utcnow()
+    db_user.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_user)
@@ -125,7 +125,7 @@ async def update_user_login(db: AsyncSession, user_id: int) -> Optional[User]:
     if not db_user:
         return None
 
-    db_user.last_login = datetime.utcnow()
+    db_user.last_login = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(db_user)
     return db_user
@@ -139,7 +139,7 @@ async def update_user_browse(db: AsyncSession, user_id: int) -> Optional[User]:
     if not db_user:
         return None
 
-    db_user.last_browse = datetime.utcnow()
+    db_user.last_browse = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(db_user)
     return db_user

@@ -5,8 +5,8 @@ Release service for managing Usenet releases
 import hashlib
 import logging
 import re
-from datetime import datetime
-from typing import Dict, List, Optional, Union
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
 from app.db.models.release import Release
@@ -44,8 +44,8 @@ async def create_release(db: AsyncSession, release_in: ReleaseCreate) -> Release
         size=release_in.size,
         files=release_in.files,
         completion=release_in.completion,
-        posted_date=release_in.posted_date or datetime.utcnow(),
-        added_date=datetime.utcnow(),
+        posted_date=release_in.posted_date or datetime.now(timezone.utc),
+        added_date=datetime.now(timezone.utc),
         status=release_in.status,
         passworded=release_in.passworded,
         category_id=release_in.category_id,

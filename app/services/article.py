@@ -4,7 +4,7 @@ Article service for processing Usenet articles
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 from app.core.config import settings
@@ -82,9 +82,9 @@ class ArticleService:
                 batch_end = min(current_id + batch_size - 1, end_id)
 
                 try:
-                    # Try to get article headers for the batch using OVER command
+                    # Try to get article headers for the batch using OVER command with string format
                     try:
-                        resp, articles = conn.over((current_id, batch_end))
+                        resp, articles = conn.over(f"{current_id}-{batch_end}")
                     except Exception as e:
                         # If OVER command fails, try using HEAD command for each article
                         logger.warning(f"OVER command failed: {str(e)}. Falling back to HEAD command.")
@@ -239,8 +239,18 @@ class ArticleService:
         """
         Process a binary post from a newsgroup
         """
+        # Ensure subject is not None
+        if subject is None:
+            subject = ""
+
         # First, try to parse subject to extract binary name and part info
         binary_name, part_num, total_parts = self._parse_binary_subject(subject)
+
+        # Check if this is likely a binary post by looking for yEnc in the subject
+        is_likely_binary = False
+        if "yenc" in subject.lower() or "yEnc" in subject:
+            is_likely_binary = True
+            logger.debug(f"Likely binary post (yEnc in subject): {subject}")
 
         # If we couldn't extract binary info from the subject, check if this is an obfuscated binary post
         # by looking for yEnc headers in the article content
@@ -253,43 +263,76 @@ class ArticleService:
 
                 # Get the article content
                 try:
-                    resp, article_info = self._conn.article(f"<{message_id}>")
+                    # Try to get the article by message ID first
+                    try:
+                        resp, article_info = self._conn.article(f"<{message_id}>")
+                    except Exception as msg_id_error:
+                        # If that fails, try by article number
+                        try:
+                            # Extract article number from message ID if possible
+                            article_num_match = re.search(r"(\d+)", message_id)
+                            if article_num_match:
+                                article_num = article_num_match.group(1)
+                                logger.debug(f"Trying to get article by number: {article_num}")
+                                resp, article_info = self._conn.article(article_num)
+                            else:
+                                raise Exception("Could not extract article number from message ID")
+                        except Exception as article_num_error:
+                            # Re-raise the original error
+                            raise msg_id_error
 
                     # Look for yEnc headers in the article content
                     yenc_begin = None
                     yenc_part = None
                     yenc_name = None
 
-                    for line in article_info.lines:
+                    for line in article_info.lines[:30]:  # Check first 30 lines
                         line_str = line.decode('utf-8', errors='replace') if isinstance(line, bytes) else line
 
                         # Check for yEnc begin line
                         if line_str.startswith("=ybegin "):
                             yenc_begin = line_str
+                            logger.debug(f"Found yEnc begin line: {yenc_begin}")
 
                             # Extract part info
                             part_match = re.search(r"part=(\d+)\s+total=(\d+)", line_str)
                             if part_match:
                                 part_num = int(part_match.group(1))
                                 total_parts = int(part_match.group(2))
+                                logger.debug(f"Extracted part info: part_num={part_num}, total_parts={total_parts}")
 
                             # Extract name
                             name_match = re.search(r"name=(.*?)$", line_str)
                             if name_match:
                                 yenc_name = name_match.group(1).strip()
+                                logger.debug(f"Extracted name: {yenc_name}")
 
                         # Check for yEnc part line
                         elif line_str.startswith("=ypart "):
                             yenc_part = line_str
+                            logger.debug(f"Found yEnc part line: {yenc_part}")
 
                         # If we found both yEnc begin and part lines, we can stop
-                        if yenc_begin and yenc_part and yenc_name:
+                        if yenc_begin and (yenc_part or part_match) and yenc_name:
                             break
 
                     # If we found yEnc headers, use the name from the yEnc header as the binary name
                     if yenc_name and part_num and total_parts:
                         binary_name = yenc_name
-                        logger.debug(f"Found obfuscated binary post: {subject} -> {binary_name} (part {part_num}/{total_parts})")
+                        logger.info(f"Found obfuscated binary post: {subject} -> {binary_name} (part {part_num}/{total_parts})")
+                    elif yenc_name and part_num:
+                        binary_name = yenc_name
+                        total_parts = 1  # Assume single part if total not specified
+                        logger.info(f"Found obfuscated binary post with unknown total parts: {subject} -> {binary_name} (part {part_num})")
+                    elif is_likely_binary:
+                        # If we think it's a binary post but couldn't extract all info, try to use what we have
+                        if not binary_name and yenc_name:
+                            binary_name = yenc_name
+                        if not part_num:
+                            part_num = 1  # Assume part 1 if not specified
+                        if not total_parts:
+                            total_parts = 1  # Assume single part if not specified
+                        logger.info(f"Reconstructed binary post info: {subject} -> {binary_name} (part {part_num}/{total_parts})")
 
                 except Exception as e:
                     logger.debug(f"Error getting article content: {str(e)}")
@@ -511,9 +554,18 @@ class ArticleService:
                     # Condition 2: Binary has at least 1 part and we don't know the total parts
                     binary["total_parts"] == 0 and len(binary["parts"]) >= 1,
 
-                    # Condition 3: Binary has at least 50% of parts and at least 3 parts
-                    binary["total_parts"] > 0 and len(binary["parts"]) >= max(3, binary["total_parts"] // 2)
+                    # Condition 3: Binary has at least 25% of parts and at least 2 parts (more relaxed)
+                    binary["total_parts"] > 0 and len(binary["parts"]) >= max(2, binary["total_parts"] // 4),
+
+                    # Condition 4: Binary has at least 5 parts (for large binaries)
+                    len(binary["parts"]) >= 5
                 ]
+
+                logger.info(f"Binary: {binary['name']}")
+                logger.info(f"  Parts: {len(binary['parts'])}/{binary['total_parts']}")
+                logger.info(f"  Size: {binary['size']}")
+                logger.info(f"  Create release conditions: {create_release_conditions}")
+                logger.info(f"  Should create release: {any(create_release_conditions)}")
 
                 if any(create_release_conditions):
                     # Calculate completion percentage
@@ -557,7 +609,7 @@ class ArticleService:
                         size=binary["size"],
                         files=len(binary["parts"]),
                         completion=completion,
-                        posted_date=datetime.utcnow(),  # Should use article date
+                        posted_date=datetime.now(timezone.utc),  # Should use article date
                         status=1,  # Active
                         passworded=0,  # Unknown
                         category_id=default_category.id,
@@ -634,7 +686,7 @@ async def process_group_update(
     # Update group's current_article_id
     if stats["processed"] > 0:
         group.current_article_id = group.last_article_id
-        group.last_updated = datetime.utcnow()
+        group.last_updated = datetime.now(timezone.utc)
         db.add(group)
         await db.commit()
 
@@ -727,7 +779,7 @@ async def process_group_backfill(
     if stats["processed"] > 0:
         # Move backfill_target forward
         group.backfill_target = start_id + stats["processed"]
-        group.last_updated = datetime.utcnow()
+        group.last_updated = datetime.now(timezone.utc)
         db.add(group)
         await db.commit()
         logger.info(f"Updated backfill target to {group.backfill_target} for group {group.name}")

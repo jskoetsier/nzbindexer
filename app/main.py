@@ -1,4 +1,6 @@
-from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
+
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 # Set up logging first
@@ -39,11 +41,25 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.sessions import SessionMiddleware
 
+# Lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events
+    """
+    # Startup
+    start_background_tasks()
+    yield
+    # Shutdown
+    stop_background_tasks()
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Modern Usenet Indexer with FastAPI",
     version="0.7.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
 # Add middleware
@@ -401,7 +417,7 @@ async def login_submit(
     logger.info(f"Access token created and stored in session for user: {user.username}")
 
     # Update last login time
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.add(user)
     await db.commit()
     logger.info(f"Last login time updated for user: {user.username}")
@@ -1189,25 +1205,6 @@ async def health_check():
     Health check endpoint
     """
     return {"status": "ok", "version": "0.7.0"}
-
-
-# Startup and shutdown events
-@app.on_event("startup")
-async def startup_event():
-    """
-    Startup event handler
-    """
-    # Start background tasks
-    start_background_tasks()
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """
-    Shutdown event handler
-    """
-    # Stop background tasks
-    stop_background_tasks()
 
 
 if __name__ == "__main__":

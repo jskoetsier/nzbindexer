@@ -2,12 +2,10 @@
 NNTP service for connecting to Usenet servers and retrieving newsgroups
 """
 
-import asyncio
+from datetime import datetime, timezone
 import logging
-
 import nntplib
 import re
-from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Union
 
 from app.core.config import settings
@@ -224,7 +222,7 @@ async def discover_newsgroups(
                     if existing_group:
                         # Update existing group
                         existing_group.description = group_description
-                        existing_group.updated_at = datetime.utcnow()
+                        existing_group.updated_at = datetime.now(timezone.utc)
                         db.add(existing_group)
                         stats["updated"] += 1
                     else:
