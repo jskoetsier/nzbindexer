@@ -122,6 +122,29 @@ class NNTPService:
             logger.error(f"Failed to get group info for {group_name}: {str(e)}")
             raise
 
+    async def get_article_body(self, message_id: str) -> Optional[List[str]]:
+        """
+        Get the body of an article by message ID
+        Returns a list of lines from the article body
+        """
+        try:
+            conn = self.connect()
+            resp, info = conn.body(message_id)
+            
+            # Convert bytes to strings if needed
+            lines = []
+            for line in info.lines:
+                if isinstance(line, bytes):
+                    lines.append(line.decode('utf-8', errors='replace'))
+                else:
+                    lines.append(line)
+            
+            conn.quit()
+            return lines
+        except Exception as e:
+            logger.debug(f"Failed to get article body for {message_id}: {str(e)}")
+            return None
+
 
 async def discover_newsgroups(
     db: AsyncSession, pattern: str = "*", active: bool = False, batch_size: int = 100

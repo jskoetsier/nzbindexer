@@ -291,74 +291,86 @@ def extract_release_metadata(name: str) -> Dict[str, any]:
 
 
 async def determine_release_category(
-    db: AsyncSession, name: str, metadata: Dict[str, any]
+    db: AsyncSession, name: str, metadata: Dict[str, any], group_name: str = None
 ) -> Optional[int]:
     """
-    Determine the appropriate category for a release based on its name and metadata
+    Determine the appropriate category for a release based on its name, metadata, and group
     """
     from app.db.models.category import Category
 
+    # Get all categories for matching
+    query = select(Category)
+    result = await db.execute(query)
+    all_categories = result.scalars().all()
+
+    # Create category mapping
+    categories = {cat.name: cat.id for cat in all_categories}
+
     # Check for TV shows
     if "season" in metadata and "episode" in metadata:
-        query = select(Category).filter(Category.name == "TV")
-        result = await db.execute(query)
-        tv_category = result.scalars().first()
-        if tv_category:
-            return tv_category.id
+        return categories.get("TV", categories.get("Other"))
 
-    # Check for movies
+    # Enhanced movie detection
     movie_keywords = [
-        "1080p",
-        "720p",
-        "2160p",
-        "4K",
-        "BDRip",
-        "BRRip",
-        "DVDRip",
-        "BluRay",
-        "WEB-DL",
+        "1080p", "720p", "2160p", "4K", "BDRip", "BRRip", "DVDRip",
+        "BluRay", "WEB-DL", "HDTV", "x264", "x265", "HEVC", "H.264",
+        "REMUX", "UHD", "HDR", "DTS", "Atmos"
     ]
-    if (
-        any(keyword.lower() in name.lower() for keyword in movie_keywords)
-        and "year" in metadata
-    ):
-        query = select(Category).filter(Category.name == "Movies")
-        result = await db.execute(query)
-        movie_category = result.scalars().first()
-        if movie_category:
-            return movie_category.id
+    if any(keyword.lower() in name.lower() for keyword in movie_keywords):
+        return categories.get("Movies", categories.get("Other"))
 
-    # Check for music
-    if "artist" in metadata and "album" in metadata:
-        query = select(Category).filter(Category.name == "Music")
-        result = await db.execute(query)
-        music_category = result.scalars().first()
-        if music_category:
-            return music_category.id
+    # Check for music - enhanced detection
+    music_keywords = ["MP3", "FLAC", "AAC", "320kbps", "V0", "V2", "Album", "Discography", "OST"]
+    music_extensions = [".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wav"]
+    if (any(keyword.lower() in name.lower() for keyword in music_keywords) or
+        any(ext.lower() in name.lower() for ext in music_extensions)):
+        return categories.get("Music", categories.get("Other"))
 
-    # Check for software
+    # Check for software/apps
     software_keywords = [
-        "Windows",
-        "MacOS",
-        "Linux",
-        "ISO",
-        "x86",
-        "x64",
-        "Setup",
-        "Install",
+        "Windows", "MacOS", "Linux", "ISO", "x86", "x64", "Setup",
+        "Install", "Portable", "Crack", "Keygen", "Patch", "v\\d+\\.\\d+",
+        "Multilingual", "x32", "AMD64"
     ]
-    if any(keyword.lower() in name.lower() for keyword in software_keywords):
-        query = select(Category).filter(Category.name == "Software")
-        result = await db.execute(query)
-        software_category = result.scalars().first()
-        if software_category:
-            return software_category.id
+    if any(re.search(keyword, name, re.IGNORECASE) for keyword in software_keywords):
+        return categories.get("Software", categories.get("Other"))
+
+    # Check for ebooks/documents
+    ebook_keywords = [
+        "PDF", "EPUB", "MOBI", "AZW3", "eBook", "Ebook", "Book",
+        "Magazine", "Comic", "CBR", "CBZ"
+    ]
+    ebook_extensions = [".pdf", ".epub", ".mobi", ".azw3", ".cbr", ".cbz"]
+    if (any(keyword.lower() in name.lower() for keyword in ebook_keywords) or
+        any(ext.lower() in name.lower() for ext in ebook_extensions)):
+        return categories.get("Books", categories.get("Other"))
+
+    # Check for games
+    game_keywords = [
+        "GAME", "RIP", "SKIDROW", "CODEX", "RELOADED", "FLT", "PLAZA",
+        "GOG", "Steam", "Crack", "PC.Game", "PS4", "XBOX", "Switch",
+        "Nintendo", "DLC", "Update.v"
+    ]
+    if any(keyword.lower() in name.lower() for keyword in game_keywords):
+        return categories.get("Games", categories.get("Other"))
+
+    # Use group name as a hint if available
+    if group_name:
+        group_lower = group_name.lower()
+
+        # Group-based categorization
+        if any(x in group_lower for x in ["hdtv", "x264", "x265", "bluray", "dvd", "movies"]):
+            return categories.get("Movies", categories.get("Other"))
+        if any(x in group_lower for x in ["tv", "television"]):
+            return categories.get("TV", categories.get("Other"))
+        if any(x in group_lower for x in ["mp3", "flac", "music", "sounds"]):
+            return categories.get("Music", categories.get("Other"))
+        if any(x in group_lower for x in ["ebook", "books", "pax"]):
+            return categories.get("Books", categories.get("Other"))
+        if any(x in group_lower for x in ["games", "console"]):
+            return categories.get("Games", categories.get("Other"))
+        if any(x in group_lower for x in ["apps", "software", "mac", "pc"]):
+            return categories.get("Software", categories.get("Other"))
 
     # Default to "Other" category
-    query = select(Category).filter(Category.name == "Other")
-    result = await db.execute(query)
-    other_category = result.scalars().first()
-    if other_category:
-        return other_category.id
-
-    return None
+    return categories.get("Other")

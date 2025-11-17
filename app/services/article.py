@@ -159,22 +159,30 @@ class ArticleService:
                                 article_num, headers_dict = article
 
                                 # Extract fields from the dictionary with safe int conversion
-                                subject = headers_dict.get('subject', '')
-                                from_addr = headers_dict.get('from', '')
-                                date_str = headers_dict.get('date', '')
-                                message_id = headers_dict.get('message-id', '')
-                                references = headers_dict.get('references', '')
+                                subject = headers_dict.get("subject", "")
+                                from_addr = headers_dict.get("from", "")
+                                date_str = headers_dict.get("date", "")
+                                message_id = headers_dict.get("message-id", "")
+                                references = headers_dict.get("references", "")
 
                                 # Safe int conversion - handle empty strings and invalid values
                                 try:
-                                    bytes_str = headers_dict.get(':bytes', '0')
-                                    bytes_count = int(bytes_str) if bytes_str and bytes_str.strip() else 0
+                                    bytes_str = headers_dict.get(":bytes", "0")
+                                    bytes_count = (
+                                        int(bytes_str)
+                                        if bytes_str and bytes_str.strip()
+                                        else 0
+                                    )
                                 except (ValueError, AttributeError):
                                     bytes_count = 0
 
                                 try:
-                                    lines_str = headers_dict.get(':lines', '0')
-                                    lines_count = int(lines_str) if lines_str and lines_str.strip() else 0
+                                    lines_str = headers_dict.get(":lines", "0")
+                                    lines_count = (
+                                        int(lines_str)
+                                        if lines_str and lines_str.strip()
+                                        else 0
+                                    )
                                 except (ValueError, AttributeError):
                                     lines_count = 0
 
@@ -182,7 +190,9 @@ class ArticleService:
 
                                 # Log successful extraction for first few articles
                                 if stats["processed"] < 3:
-                                    logger.info(f"[FIX] Extracted from dict: article={article_num}, subject='{subject}'")
+                                    logger.info(
+                                        f"[FIX] Extracted from dict: article={article_num}, subject='{subject}'"
+                                    )
                             else:
                                 # Handle other unexpected formats
                                 logger.warning(f"Unexpected article format: {article}")
@@ -309,29 +319,33 @@ class ArticleService:
 
         # If subject parsing succeeded, use the extracted binary name
         if binary_name and part_num:
-            logger.debug(f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}")
+            logger.debug(
+                f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}"
+            )
             # Use the binary name as-is from the subject
         else:
             # Subject parsing failed - might be obfuscated or non-standard format
             # But first check if it still looks like a binary post
 
             # Check if this looks like a binary post at all
-            has_binary_indicators = any([
-                'yenc' in subject.lower(),
-                'yEnc' in subject,
-                re.search(r'\[\d+/\d+\]', subject),  # Has part indicator [01/50]
-                re.search(r'\(\d+/\d+\)', subject),   # Has part indicator (01/50)
-                re.search(r'\d+/\d+', subject),       # Has any number pattern like 01/50
-                bytes_count > 1000,  # Fairly small threshold (1KB)
-                len(subject) > 10,  # Has some subject text
-            ])
+            has_binary_indicators = any(
+                [
+                    "yenc" in subject.lower(),
+                    "yEnc" in subject,
+                    re.search(r"\[\d+/\d+\]", subject),  # Has part indicator [01/50]
+                    re.search(r"\(\d+/\d+\)", subject),  # Has part indicator (01/50)
+                    re.search(r"\d+/\d+", subject),  # Has any number pattern like 01/50
+                    bytes_count > 1000,  # Fairly small threshold (1KB)
+                    len(subject) > 10,  # Has some subject text
+                ]
+            )
 
             if not has_binary_indicators:
                 # Not a binary post, skip silently
                 return
 
             # Extract part numbers from subject if available
-            part_match = re.search(r'[\[\(]?(\d+)/(\d+)[\]\)]?', subject)
+            part_match = re.search(r"[\[\(]?(\d+)/(\d+)[\]\)]?", subject)
             if part_match:
                 part_num = int(part_match.group(1))
                 total_parts = int(part_match.group(2))
@@ -342,18 +356,28 @@ class ArticleService:
 
             # For posts without proper naming, use the subject as binary name if it's meaningful
             # Remove part numbers for grouping
-            subject_base = re.sub(r'[\[\(]?\d+/\d+[\]\)]?', '', subject).strip()
-            subject_base = re.sub(r'-\s*yEnc.*$', '', subject_base, flags=re.IGNORECASE).strip()
-            subject_base = re.sub(r'\s*yEnc.*$', '', subject_base, flags=re.IGNORECASE).strip()
+            subject_base = re.sub(r"[\[\(]?\d+/\d+[\]\)]?", "", subject).strip()
+            subject_base = re.sub(
+                r"-\s*yEnc.*$", "", subject_base, flags=re.IGNORECASE
+            ).strip()
+            subject_base = re.sub(
+                r"\s*yEnc.*$", "", subject_base, flags=re.IGNORECASE
+            ).strip()
 
             # If we have a meaningful subject (at least 10 chars), use it
             if len(subject_base) >= 10:
                 binary_name = subject_base
-                logger.debug(f"Using subject as binary name: {binary_name} part {part_num}/{total_parts}")
+                logger.debug(
+                    f"Using subject as binary name: {binary_name} part {part_num}/{total_parts}"
+                )
             else:
                 # Only mark as obfuscated if the subject is really too short to be useful
-                binary_name = f"obfuscated_{hash(subject_base or message_id) & 0x7FFFFFFF}"
-                logger.debug(f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}")
+                binary_name = (
+                    f"obfuscated_{hash(subject_base or message_id) & 0x7FFFFFFF}"
+                )
+                logger.debug(
+                    f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}"
+                )
 
         # Create or update binary entry
         binary_key = self._get_binary_key(binary_name)
@@ -364,7 +388,9 @@ class ArticleService:
                 "parts": {},
                 "total_parts": total_parts or 0,
                 "size": 0,
-                "obfuscated": binary_name.startswith("obfuscated_"),  # Track if this is obfuscated
+                "obfuscated": binary_name.startswith(
+                    "obfuscated_"
+                ),  # Track if this is obfuscated
                 "message_ids": [],  # Store message IDs for later yEnc header fetching
             }
             binary_subjects[binary_key] = subject
@@ -504,6 +530,37 @@ class ArticleService:
         key = re.sub(r"[^a-z0-9]", "", key)
         return key
 
+    async def _get_real_filename_from_yenc(self, message_id: str) -> Optional[str]:
+        """
+        Fetch the real filename from yEnc headers for an obfuscated post
+        """
+        try:
+            # Get the article body
+            body_lines = await self.nntp_service.get_article_body(message_id)
+
+            if not body_lines:
+                logger.debug(f"No body found for message_id: {message_id}")
+                return None
+
+            # Look for yEnc header line (=ybegin)
+            for line in body_lines[:50]:  # Check first 50 lines
+                if line.startswith("=ybegin"):
+                    # Parse yEnc header: =ybegin part=1 total=50 line=128 size=500000 name=actual_filename.ext
+                    match = re.search(r"name=(.+?)(?:\s|$)", line)
+                    if match:
+                        filename = match.group(1).strip()
+                        logger.info(
+                            f"Deobfuscated filename from yEnc header: {filename}"
+                        )
+                        return filename
+
+            logger.debug(f"No yEnc header found in message_id: {message_id}")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error fetching yEnc filename for {message_id}: {str(e)}")
+            return None
+
     async def _process_binaries_to_releases(
         self,
         db: AsyncSession,
@@ -592,10 +649,35 @@ class ArticleService:
                             (len(binary["parts"]) / binary["total_parts"]) * 100.0,
                         )
 
+                    # Deobfuscate the binary name if it's obfuscated
+                    release_name = binary["name"]
+                    if binary.get("obfuscated", False) and binary.get("message_ids"):
+                        # Try to get the real filename from yEnc headers
+                        logger.info(
+                            f"Attempting to deobfuscate binary: {binary['name']}"
+                        )
+                        for message_id in binary["message_ids"][
+                            :3
+                        ]:  # Try first 3 message IDs
+                            real_filename = await self._get_real_filename_from_yenc(
+                                message_id
+                            )
+                            if real_filename:
+                                release_name = real_filename
+                                logger.info(
+                                    f"Successfully deobfuscated: {binary['name']} -> {release_name}"
+                                )
+                                break
+
+                        if release_name == binary["name"]:
+                            logger.warning(
+                                f"Could not deobfuscate binary: {binary['name']}"
+                            )
+
                     # Check if release already exists
                     from app.services.release import create_release_guid
 
-                    guid = create_release_guid(binary["name"], group.name)
+                    guid = create_release_guid(release_name, group.name)
 
                     query = select(Release).filter(Release.guid == guid)
                     result = await db.execute(query)
@@ -615,9 +697,9 @@ class ArticleService:
                         continue
 
                     # Create new release
-                    subject = binary_subjects.get(binary_key, binary["name"])
+                    subject = binary_subjects.get(binary_key, release_name)
                     logger.info(
-                        f"Creating release for binary: {binary['name']} with {len(binary['parts'])}/{binary['total_parts']} parts"
+                        f"Creating release for binary: {release_name} with {len(binary['parts'])}/{binary['total_parts']} parts"
                     )
 
                     from app.schemas.release import ReleaseCreate
@@ -626,8 +708,8 @@ class ArticleService:
                     from app.services.release import create_release
 
                     release_data = ReleaseCreate(
-                        name=binary["name"],
-                        search_name=self._create_search_name(binary["name"]),
+                        name=release_name,
+                        search_name=self._create_search_name(release_name),
                         guid=guid,
                         size=binary["size"],
                         files=len(binary["parts"]),
@@ -640,6 +722,23 @@ class ArticleService:
                     )
 
                     release = await create_release(db, release_data)
+
+                    # Try to categorize better based on name and group
+                    from app.services.release import (
+                        determine_release_category,
+                        extract_release_metadata,
+                    )
+
+                    metadata = extract_release_metadata(release_name)
+                    better_category_id = await determine_release_category(
+                        db, release_name, metadata, group.name
+                    )
+
+                    if better_category_id and better_category_id != default_category.id:
+                        release.category_id = better_category_id
+                        db.add(release)
+                        await db.commit()
+                        await db.refresh(release)
 
                     # Generate NZB file for the release
                     from app.services.nzb import NZBService
