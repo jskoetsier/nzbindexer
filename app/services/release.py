@@ -101,9 +101,10 @@ async def get_release(db: AsyncSession, release_id: int) -> Optional[Release]:
     """
     from sqlalchemy.orm import joinedload
 
-    query = select(Release).filter(Release.id == release_id).options(
-        joinedload(Release.category),
-        joinedload(Release.group)
+    query = (
+        select(Release)
+        .filter(Release.id == release_id)
+        .options(joinedload(Release.category), joinedload(Release.group))
     )
     result = await db.execute(query)
     return result.scalars().first()
@@ -312,44 +313,108 @@ async def determine_release_category(
 
     # Enhanced movie detection
     movie_keywords = [
-        "1080p", "720p", "2160p", "4K", "BDRip", "BRRip", "DVDRip",
-        "BluRay", "WEB-DL", "HDTV", "x264", "x265", "HEVC", "H.264",
-        "REMUX", "UHD", "HDR", "DTS", "Atmos"
+        "1080p",
+        "720p",
+        "2160p",
+        "4K",
+        "BDRip",
+        "BRRip",
+        "DVDRip",
+        "BluRay",
+        "WEB-DL",
+        "HDTV",
+        "x264",
+        "x265",
+        "HEVC",
+        "H.264",
+        "REMUX",
+        "UHD",
+        "HDR",
+        "DTS",
+        "Atmos",
     ]
     if any(keyword.lower() in name.lower() for keyword in movie_keywords):
         return categories.get("Movies", categories.get("Other"))
 
     # Check for music - enhanced detection
-    music_keywords = ["MP3", "FLAC", "AAC", "320kbps", "V0", "V2", "Album", "Discography", "OST"]
+    music_keywords = [
+        "MP3",
+        "FLAC",
+        "AAC",
+        "320kbps",
+        "V0",
+        "V2",
+        "Album",
+        "Discography",
+        "OST",
+    ]
     music_extensions = [".mp3", ".flac", ".m4a", ".aac", ".ogg", ".wav"]
-    if (any(keyword.lower() in name.lower() for keyword in music_keywords) or
-        any(ext.lower() in name.lower() for ext in music_extensions)):
+    if any(keyword.lower() in name.lower() for keyword in music_keywords) or any(
+        ext.lower() in name.lower() for ext in music_extensions
+    ):
         return categories.get("Audio", categories.get("Other"))
 
     # Check for software/apps - PC category
     software_keywords = [
-        "Windows", "MacOS", "Linux", "ISO", "x86", "x64", "Setup",
-        "Install", "Portable", "Crack", "Keygen", "Patch", "v\\d+\\.\\d+",
-        "Multilingual", "x32", "AMD64"
+        "Windows",
+        "MacOS",
+        "Linux",
+        "ISO",
+        "x86",
+        "x64",
+        "Setup",
+        "Install",
+        "Portable",
+        "Crack",
+        "Keygen",
+        "Patch",
+        "v\\d+\\.\\d+",
+        "Multilingual",
+        "x32",
+        "AMD64",
     ]
     if any(re.search(keyword, name, re.IGNORECASE) for keyword in software_keywords):
         return categories.get("PC", categories.get("Other"))
 
     # Check for ebooks/documents
     ebook_keywords = [
-        "PDF", "EPUB", "MOBI", "AZW3", "eBook", "Ebook", "Book",
-        "Magazine", "Comic", "CBR", "CBZ"
+        "PDF",
+        "EPUB",
+        "MOBI",
+        "AZW3",
+        "eBook",
+        "Ebook",
+        "Book",
+        "Magazine",
+        "Comic",
+        "CBR",
+        "CBZ",
     ]
     ebook_extensions = [".pdf", ".epub", ".mobi", ".azw3", ".cbr", ".cbz"]
-    if (any(keyword.lower() in name.lower() for keyword in ebook_keywords) or
-        any(ext.lower() in name.lower() for ext in ebook_extensions)):
+    if any(keyword.lower() in name.lower() for keyword in ebook_keywords) or any(
+        ext.lower() in name.lower() for ext in ebook_extensions
+    ):
         return categories.get("Books", categories.get("Other"))
 
     # Check for games - Console category
     game_keywords = [
-        "GAME", "RIP", "SKIDROW", "CODEX", "RELOADED", "FLT", "PLAZA",
-        "GOG", "Steam", "Crack", "PC.Game", "PS4", "XBOX", "Switch",
-        "Nintendo", "DLC", "Update.v"
+        "GAME",
+        "RIP",
+        "SKIDROW",
+        "CODEX",
+        "RELOADED",
+        "FLT",
+        "PLAZA",
+        "GOG",
+        "Steam",
+        "Crack",
+        "PC.Game",
+        "PS4",
+        "XBOX",
+        "Switch",
+        "Nintendo",
+        "DLC",
+        "Update.v",
     ]
     if any(keyword.lower() in name.lower() for keyword in game_keywords):
         return categories.get("Console", categories.get("Other"))
@@ -359,7 +424,10 @@ async def determine_release_category(
         group_lower = group_name.lower()
 
         # Group-based categorization
-        if any(x in group_lower for x in ["hdtv", "x264", "x265", "bluray", "dvd", "movies"]):
+        if any(
+            x in group_lower
+            for x in ["hdtv", "x264", "x265", "bluray", "dvd", "movies"]
+        ):
             return categories.get("Movies", categories.get("Other"))
         if any(x in group_lower for x in ["tv", "television"]):
             return categories.get("TV", categories.get("Other"))

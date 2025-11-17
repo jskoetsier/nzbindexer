@@ -364,14 +364,21 @@ class ArticleService:
                 r"\s*yEnc.*$", "", subject_base, flags=re.IGNORECASE
             ).strip()
 
-            # If we have a meaningful subject (at least 10 chars), use it
-            if len(subject_base) >= 10:
+            # Check if this is a hash-like obfuscated name (hex string of 16+ chars or similar patterns)
+            is_hash_name = (
+                re.match(r'^[a-fA-F0-9]{16,}$', subject_base) or  # Hex hash
+                re.match(r'^[a-zA-Z0-9_-]{20,}$', subject_base) or  # Base64-like
+                len(subject_base) < 10  # Too short
+            )
+
+            # If we have a meaningful subject (at least 10 chars AND not a hash), use it
+            if len(subject_base) >= 10 and not is_hash_name:
                 binary_name = subject_base
                 logger.debug(
                     f"Using subject as binary name: {binary_name} part {part_num}/{total_parts}"
                 )
             else:
-                # Only mark as obfuscated if the subject is really too short to be useful
+                # Mark as obfuscated - use hash for grouping
                 binary_name = (
                     f"obfuscated_{hash(subject_base or message_id) & 0x7FFFFFFF}"
                 )
