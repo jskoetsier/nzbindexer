@@ -345,20 +345,23 @@ def start_background_tasks() -> None:
     """
     Start all background tasks
     """
-    logger.info("Starting background tasks")
-
-    # Create event loop
-    loop = asyncio.get_event_loop()
-
-    # Start update task
-    update_task = loop.create_task(update_groups_task())
-    running_tasks["update_groups"] = update_task
-
-    # Start backfill task
-    backfill_task = loop.create_task(backfill_groups_task())
-    running_tasks["backfill_groups"] = backfill_task
-
-    logger.info("Background tasks started")
+    logger.info("Background tasks disabled to prevent resource exhaustion")
+    logger.info("Please use the admin panel to manually start updates when needed")
+    # Temporarily disabled - uncomment when ready to enable automatic updates
+    # logger.info("Starting background tasks")
+    #
+    # # Create event loop
+    # loop = asyncio.get_event_loop()
+    #
+    # # Start update task
+    # update_task = loop.create_task(update_groups_task())
+    # running_tasks["update_groups"] = update_task
+    #
+    # # Start backfill task
+    # backfill_task = loop.create_task(backfill_groups_task())
+    # running_tasks["backfill_groups"] = backfill_task
+    #
+    # logger.info("Background tasks started")
 
 
 def stop_background_tasks() -> None:

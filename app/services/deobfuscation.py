@@ -6,13 +6,16 @@ This module provides comprehensive methods for deobfuscating filenames including
 - Par2 file parsing
 - Hash/encoding detection and reversal
 - Improved yEnc decoding
+- PreDB (Pre-Release Database) lookups
 """
 
-import base64
 import logging
 import re
 import struct
 from typing import List, Optional, Tuple
+import base64
+import aiohttp
+import asyncio
 
 logger = logging.getLogger(__name__)
 
