@@ -1102,7 +1102,7 @@ class ArticleService:
                             logger.info(f"Trying NZBHydra2 lookup for: {search_hash}")
                             from app.services.nzbhydra import NZBHydraService
                             from app.core.config import settings
-                              
+
                             if settings.NZBHYDRA_URL and settings.NZBHYDRA_API_KEY:
                                 hydra_service = NZBHydraService(
                                     settings.NZBHYDRA_URL,
@@ -1185,14 +1185,16 @@ class ArticleService:
                                 found_real_name = True
                                 logger.info(
                                     f"✓ NFO EXTRACTION SUCCESS: {binary['name']} -> {release_name}"
-                                )
+                              )
 
-                        # If nothing worked, skip this binary
+                        # If nothing worked, keep the obfuscated name and create release anyway
+                        # We'll mark it for later deobfuscation attempts
                         if not found_real_name:
                             logger.warning(
-                                f"✗ COMPLETE FAILURE: {binary['name']} - tried PreDB, hash decode, archive, NFO. SKIPPING."
+                                f"⚠ DEOBFUSCATION PENDING: {binary['name']} - will retry with future ORN cache updates"
                             )
-                            continue
+                            # Keep the obfuscated name - we'll create the release below
+                            # The release will be searchable by hash once we get the mapping
 
                             if nfo_release_name:
                                 release_name = nfo_release_name
