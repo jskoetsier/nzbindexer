@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     TVDB_API_KEY: str = ""
     TVMAZE_API_KEY: str = ""
     OMDB_API_KEY: str = ""
+    
+    # NZBHydra2 Integration
+    NZBHYDRA_URL: str = "http://192.168.1.153:5076"
+    NZBHYDRA_API_KEY: str = "FT23M2QC3JERO03DF0II5AR2JH"
 
     # Indexer settings
     UPDATE_THREADS: int = 1

@@ -72,14 +72,14 @@ if [ "$HTTP_CODE" = "200" ]; then
     echo "  NZBHYDRA_URL=${HYDRA_URL}"
     echo "  NZBHYDRA_API_KEY=${API_KEY}"
     echo ""
-    
+
     # Save to .env if it exists
     if [ -f ".env" ]; then
         echo "NZBHYDRA_URL=${HYDRA_URL}" >> .env
         echo "NZBHYDRA_API_KEY=${API_KEY}" >> .env
         echo "✓ Saved to .env file"
     fi
-    
+
     echo ""
     echo "Next steps:"
     echo "1. Add indexers to NZBHydra2 (DrunkenSlug, NZBGeek, etc.)"

@@ -1097,7 +1097,33 @@ class ArticleService:
                             finally:
                                 await predb_service.close()
 
-                        # Step 3: Try Newznab cross-indexer lookup (if PreDB failed)
+                        # Step 3: Try NZBHydra2 lookup (if PreDB failed)
+                        if not found_real_name and self.deobfuscation_service.is_obfuscated_hash(search_hash):
+                            logger.info(f"Trying NZBHydra2 lookup for: {search_hash}")
+                            from app.services.nzbhydra import NZBHydraService
+                            from app.core.config import settings
+                              
+                            if settings.NZBHYDRA_URL and settings.NZBHYDRA_API_KEY:
+                                hydra_service = NZBHydraService(
+                                    settings.NZBHYDRA_URL,
+                                    settings.NZBHYDRA_API_KEY
+                                )
+                                try:
+                                    hydra_result = await hydra_service.lookup_hash(search_hash)
+                                    if hydra_result:
+                                        release_name = hydra_result
+                                        found_real_name = True
+                                        logger.info(
+                                            f"✓ NZBHYDRA2 SUCCESS: {binary['name']} -> {release_name}"
+                                        )
+                                except Exception as e:
+                                    logger.warning(f"NZBHydra2 lookup error: {e}")
+                                finally:
+                                    await hydra_service.close()
+                            else:
+                                logger.debug("NZBHydra2 not configured, skipping")
+
+                        # Step 4: Try Newznab cross-indexer lookup (if still not found)
                         if not found_real_name and self.deobfuscation_service.is_obfuscated_hash(search_hash):
                             logger.info(f"Trying Newznab lookup for: {search_hash}")
                             # TODO: Configure Newznab indexers in settings
