@@ -97,9 +97,14 @@ async def update_release(
 
 async def get_release(db: AsyncSession, release_id: int) -> Optional[Release]:
     """
-    Get a release by ID
+    Get a release by ID with eagerly loaded relationships
     """
-    query = select(Release).filter(Release.id == release_id)
+    from sqlalchemy.orm import joinedload
+
+    query = select(Release).filter(Release.id == release_id).options(
+        joinedload(Release.category),
+        joinedload(Release.group)
+    )
     result = await db.execute(query)
     return result.scalars().first()
 

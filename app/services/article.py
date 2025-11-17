@@ -307,15 +307,15 @@ class ArticleService:
         # First, try to parse subject to extract binary name and part info
         binary_name, part_num, total_parts = self._parse_binary_subject(subject)
 
-        # If subject parsing succeeded, we have a clean/traditional post
+        # If subject parsing succeeded, use the extracted binary name
         if binary_name and part_num:
             logger.debug(f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}")
+            # Use the binary name as-is from the subject
         else:
-            # Subject parsing failed - this is likely an obfuscated post
-            # For obfuscated posts, we'll use the subject itself as a placeholder
+            # Subject parsing failed - might be obfuscated or non-standard format
+            # But first check if it still looks like a binary post
 
             # Check if this looks like a binary post at all
-            # Be VERY permissive here - most Usenet posts ARE binary
             has_binary_indicators = any([
                 'yenc' in subject.lower(),
                 'yEnc' in subject,
@@ -330,7 +330,6 @@ class ArticleService:
                 # Not a binary post, skip silently
                 return
 
-            # This appears to be an obfuscated binary post
             # Extract part numbers from subject if available
             part_match = re.search(r'[\[\(]?(\d+)/(\d+)[\]\)]?', subject)
             if part_match:
@@ -341,15 +340,20 @@ class ArticleService:
                 part_num = 1
                 total_parts = 1
 
-            # For obfuscated posts, use a hash of the subject line minus the part numbers as the binary name
-            # This groups parts of the same post together
+            # For posts without proper naming, use the subject as binary name if it's meaningful
+            # Remove part numbers for grouping
             subject_base = re.sub(r'[\[\(]?\d+/\d+[\]\)]?', '', subject).strip()
-            if len(subject_base) < 3:
-                # Subject is too short after removing part numbers - use message_id hash instead
-                subject_base = message_id
-            binary_name = f"obfuscated_{hash(subject_base) & 0x7FFFFFFF}"  # Positive hash
+            subject_base = re.sub(r'-\s*yEnc.*$', '', subject_base, flags=re.IGNORECASE).strip()
+            subject_base = re.sub(r'\s*yEnc.*$', '', subject_base, flags=re.IGNORECASE).strip()
 
-            logger.debug(f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}")
+            # If we have a meaningful subject (at least 10 chars), use it
+            if len(subject_base) >= 10:
+                binary_name = subject_base
+                logger.debug(f"Using subject as binary name: {binary_name} part {part_num}/{total_parts}")
+            else:
+                # Only mark as obfuscated if the subject is really too short to be useful
+                binary_name = f"obfuscated_{hash(subject_base or message_id) & 0x7FFFFFFF}"
+                logger.debug(f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}")
 
         # Create or update binary entry
         binary_key = self._get_binary_key(binary_name)
@@ -374,13 +378,6 @@ class ArticleService:
             }
             binaries[binary_key]["size"] += bytes_count
             binaries[binary_key]["message_ids"].append(message_id)
-
-        # Update total parts if we have a new value
-        if total_parts and binaries[binary_key]["total_parts"] < total_parts:
-            binaries[binary_key]["total_parts"] = total_parts
-
-        # Return binary info for logging
-        return f"{binary_name} (part {part_num}/{total_parts})"
 
         # Update total parts if we have a new value
         if total_parts and binaries[binary_key]["total_parts"] < total_parts:
