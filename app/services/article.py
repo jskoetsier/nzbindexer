@@ -317,12 +317,39 @@ class ArticleService:
         # First, try to parse subject to extract binary name and part info
         binary_name, part_num, total_parts = self._parse_binary_subject(subject)
 
-        # If subject parsing succeeded, use the extracted binary name
+        # If subject parsing succeeded, check if the binary name is actually meaningful
         if binary_name and part_num:
-            logger.debug(
-                f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}"
+            # Check if the parsed binary name is a hash-like obfuscated name
+            subject_no_ext = re.sub(
+                r"\.(rar|par2?|zip|7z|r\d+|vol\d+)$",
+                "",
+                binary_name,
+                flags=re.IGNORECASE,
             )
-            # Use the binary name as-is from the subject
+
+            is_hash_name = (
+                re.match(r"^[a-fA-F0-9]{16,}$", subject_no_ext)  # Hex hash (16+ chars)
+                or re.match(
+                    r"^[a-fA-F0-9]{16,}$", binary_name
+                )  # Hex hash with extension
+                or re.match(
+                    r"^[a-zA-Z0-9_-]{22,}$", subject_no_ext
+                )  # Base64-like (22+ chars, no spaces)
+                or len(binary_name) < 10  # Too short
+            )
+
+            if is_hash_name:
+                # Even though we parsed it, it's still obfuscated - mark it as such
+                logger.debug(
+                    f"Parsed binary name is hash-like, marking as obfuscated: {binary_name}"
+                )
+                binary_name = (
+                    f"obfuscated_{hash(binary_name or message_id) & 0x7FFFFFFF}"
+                )
+            else:
+                logger.debug(
+                    f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}"
+                )
         else:
             # Subject parsing failed - might be obfuscated or non-standard format
             # But first check if it still looks like a binary post
@@ -366,13 +393,22 @@ class ArticleService:
 
             # Check if this is a hash-like obfuscated name
             # Strip common extensions first
-            subject_no_ext = re.sub(r'\.(rar|par2?|zip|7z|r\d+|vol\d+)$', '', subject_base, flags=re.IGNORECASE)
-            
+            subject_no_ext = re.sub(
+                r"\.(rar|par2?|zip|7z|r\d+|vol\d+)$",
+                "",
+                subject_base,
+                flags=re.IGNORECASE,
+            )
+
             is_hash_name = (
-                re.match(r'^[a-fA-F0-9]{16,}$', subject_no_ext) or  # Hex hash (16+ chars)
-                re.match(r'^[a-fA-F0-9]{16,}$', subject_base) or  # Hex hash with extension
-                re.match(r'^[a-zA-Z0-9_-]{22,}$', subject_no_ext) or  # Base64-like (22+ chars, no spaces)
-                len(subject_base) < 10  # Too short
+                re.match(r"^[a-fA-F0-9]{16,}$", subject_no_ext)  # Hex hash (16+ chars)
+                or re.match(
+                    r"^[a-fA-F0-9]{16,}$", subject_base
+                )  # Hex hash with extension
+                or re.match(
+                    r"^[a-zA-Z0-9_-]{22,}$", subject_no_ext
+                )  # Base64-like (22+ chars, no spaces)
+                or len(subject_base) < 10  # Too short
             )
 
             # If we have a meaningful subject (at least 10 chars AND not a hash), use it
