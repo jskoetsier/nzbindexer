@@ -203,10 +203,10 @@ class ArticleService:
                             except Exception:
                                 message_id = f"unknown-{article_num}@placeholder.nzb"
 
-                            # Log the subject for debugging
-                            if stats["processed"] % 100 == 0:  # Log every 100th article
+                            # AGGRESSIVE DEBUG: Log EVERY subject for the first 20 articles
+                            if stats["processed"] < 20:
                                 logger.info(
-                                    f"Sample subject at article {article_num}: {subject}"
+                                    f"[DEBUG] Article {article_num}: subject='{subject}', bytes={bytes_count}, message_id={message_id}"
                                 )
 
                             # Process binary post
@@ -220,7 +220,11 @@ class ArticleService:
 
                             if binary_result:
                                 logger.info(
-                                    f"Found binary post: {subject} -> {binary_result}"
+                                    f"✓ Found binary post: {subject} -> {binary_result}"
+                                )
+                            elif stats["processed"] < 20:
+                                logger.warning(
+                                    f"✗ SKIPPED article {article_num}: {subject}"
                                 )
 
                             stats["processed"] += 1
@@ -284,7 +288,7 @@ class ArticleService:
         else:
             # Subject parsing failed - this is likely an obfuscated post
             # For obfuscated posts, we'll use the subject itself as a placeholder
-            
+
             # Check if this looks like a binary post at all
             # Be VERY permissive here - most Usenet posts ARE binary
             has_binary_indicators = any([
@@ -296,11 +300,11 @@ class ArticleService:
                 bytes_count > 1000,  # Fairly small threshold (1KB)
                 len(subject) > 10,  # Has some subject text
             ])
-            
+
             if not has_binary_indicators:
                 # Not a binary post, skip silently
                 return
-                
+
             # This appears to be an obfuscated binary post
             # Extract part numbers from subject if available
             part_match = re.search(r'[\[\(]?(\d+)/(\d+)[\]\)]?', subject)
@@ -311,7 +315,7 @@ class ArticleService:
                 # No part info in subject, assume single part for now
                 part_num = 1
                 total_parts = 1
-            
+
             # For obfuscated posts, use a hash of the subject line minus the part numbers as the binary name
             # This groups parts of the same post together
             subject_base = re.sub(r'[\[\(]?\d+/\d+[\]\)]?', '', subject).strip()
@@ -319,7 +323,7 @@ class ArticleService:
                 # Subject is too short after removing part numbers - use message_id hash instead
                 subject_base = message_id
             binary_name = f"obfuscated_{hash(subject_base) & 0x7FFFFFFF}"  # Positive hash
-            
+
             logger.debug(f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}")
 
         # Create or update binary entry
