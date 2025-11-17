@@ -157,17 +157,29 @@ class ArticleService:
                                 # CRITICAL FIX: NNTP OVER command returns a dict, not a simple tuple!
                                 # The second element is a dictionary with all the header info
                                 article_num, headers_dict = article
-                                
-                                # Extract fields from the dictionary
+
+                                # Extract fields from the dictionary with safe int conversion
                                 subject = headers_dict.get('subject', '')
                                 from_addr = headers_dict.get('from', '')
                                 date_str = headers_dict.get('date', '')
                                 message_id = headers_dict.get('message-id', '')
                                 references = headers_dict.get('references', '')
-                                bytes_count = int(headers_dict.get(':bytes', 0))
-                                lines_count = int(headers_dict.get(':lines', 0))
+
+                                # Safe int conversion - handle empty strings and invalid values
+                                try:
+                                    bytes_str = headers_dict.get(':bytes', '0')
+                                    bytes_count = int(bytes_str) if bytes_str and bytes_str.strip() else 0
+                                except (ValueError, AttributeError):
+                                    bytes_count = 0
+
+                                try:
+                                    lines_str = headers_dict.get(':lines', '0')
+                                    lines_count = int(lines_str) if lines_str and lines_str.strip() else 0
+                                except (ValueError, AttributeError):
+                                    lines_count = 0
+
                                 other = {}
-                                
+
                                 # Log successful extraction for first few articles
                                 if stats["processed"] < 3:
                                     logger.info(f"[FIX] Extracted from dict: article={article_num}, subject='{subject}'")
