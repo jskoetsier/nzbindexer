@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nzbindexer"
-version = "0.9.0"
+version = "1.0.0"
 description = "A modern Usenet indexer using FastAPI, SQLAlchemy, and modern Python practices"
 authors = ["Johan Sebastiaan <johansebastiaan@example.com>"]
 readme = "README.md"

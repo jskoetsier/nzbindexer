@@ -9,17 +9,29 @@ A modern Usenet indexer built with FastAPI, featuring a responsive web interface
 - **Group Management**: View and manage Usenet newsgroups
 - **Admin Panel**: Configure groups, manage users, and monitor system status
 - **API Access**: Complete RESTful API with OpenAPI documentation
-- **Backfill Support**: Track and manage article backfilling
-- **Article Processing**: Convert Usenet articles into releases
+- **Smart Backfill System**: Day-based backfilling with automatic target calculation
+  - Configure backfill by number of days (0-365)
+  - Automatic article target calculation based on group activity
+  - Progress tracking and visualization
+  - Runs automatically every 5 minutes
+- **Robust Article Processing**: Convert Usenet articles into releases
+  - NNTP OVER dictionary format parsing
+  - Safe int conversion with comprehensive error handling
+  - Binary post detection and grouping
+  - Part tracking and completion percentage calculation
 - **Obfuscated Binary Support**: Process modern binary posts with obfuscated subjects
 - **yEnc Header Detection**: Extract filenames from yEnc headers in article content
 - **Release Management**: Extract metadata and categorize releases
+  - Automatic release creation from complete binaries
+  - Multiple completion criteria (100%, ≥25% with ≥2 parts, or ≥5 parts)
+  - Size tracking and validation
 - **NZB Generation**: Create NZB files for downloads with obfuscation
 - **Search Functionality**: Find releases by name, category, and more
 - **Sonarr/Radarr Integration**: Compatible with automation tools via Newznab API
 - **Batch Processing**: Efficient group discovery with progress tracking
 - **Job Control**: Cancel long-running tasks when needed
 - **Diagnostic Tools**: Analyze NNTP connections and article processing
+- **Comprehensive Error Logging**: Detailed tracebacks for debugging and monitoring
 
 ## Screenshots
 
