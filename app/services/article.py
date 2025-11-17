@@ -171,6 +171,11 @@ class ArticleService:
 
                             # Skip articles with no subject or message_id
                             if not subject or not message_id:
+                                # CRITICAL DEBUG: Log why article is being skipped
+                                if stats["skipped"] < 5:
+                                    logger.warning(
+                                        f"[CRITICAL] Article {article_num} skipped: subject={repr(subject)}, message_id={repr(message_id)}"
+                                    )
                                 stats["skipped"] += 1
                                 continue
 
