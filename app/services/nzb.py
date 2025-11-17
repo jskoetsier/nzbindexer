@@ -36,7 +36,7 @@ class NZBService:
         self.nntp_service = nntp_service or NNTPService()
 
         # Ensure NZB directory exists
-        self.nzb_dir = os.path.join(settings.DATA_DIR, "nzb")
+        self.nzb_dir = settings.NZB_DIR
         os.makedirs(self.nzb_dir, exist_ok=True)
 
     async def generate_nzb(self, db: AsyncSession, release_id: int) -> Optional[str]:
@@ -72,7 +72,7 @@ class NZBService:
             # 3. Saving the XML file
 
             # For now, we'll create a placeholder NZB file
-            await self._create_placeholder_nzb(release, nzb_path)
+            await self._create_placeholder_nzb(release, nzb_path, db)
 
             return nzb_path
 
@@ -116,7 +116,7 @@ class NZBService:
         # Return both the obfuscated subject and the original
         return obfuscated, subject
 
-    async def _create_placeholder_nzb(self, release: Release, nzb_path: str) -> None:
+    async def _create_placeholder_nzb(self, release: Release, nzb_path: str, db: AsyncSession) -> None:
         """
         Create a placeholder NZB file for a release with obfuscation
         This is a temporary solution until we implement actual NZB generation
