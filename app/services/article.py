@@ -703,23 +703,55 @@ class ArticleService:
                         logger.info(
                             f"Attempting to deobfuscate binary: {binary['name']}"
                         )
-                        for message_id in binary["message_ids"][
-                            :3
-                        ]:  # Try first 3 message IDs
+
+                        # Helper function to check if a filename is still a hash
+                        def is_filename_hash(filename: str) -> bool:
+                            """Check if a filename (after deobfuscation) is still a hash"""
+                            # Strip extensions
+                            name_no_ext = re.sub(
+                                r"\.(rar|par2?|zip|7z|r\d+|vol\d+)$",
+                                "",
+                                filename,
+                                flags=re.IGNORECASE,
+                            )
+
+                            # Check for hash patterns
+                            return bool(
+                                re.match(r"^[a-fA-F0-9]{16,}$", name_no_ext)  # Hex hash
+                                or re.match(
+                                    r"^[a-zA-Z0-9_-]{22,}$", name_no_ext
+                                )  # Base64-like
+                            )
+
+                        # Try up to 10 message IDs to find a non-hash filename
+                        found_real_name = False
+                        for message_id in binary["message_ids"][:10]:
                             real_filename = await self._get_real_filename_from_yenc(
                                 message_id
                             )
                             if real_filename:
-                                release_name = real_filename
-                                logger.info(
-                                    f"Successfully deobfuscated: {binary['name']} -> {release_name}"
-                                )
-                                break
+                                # Check if this "deobfuscated" name is still a hash
+                                if is_filename_hash(real_filename):
+                                    logger.debug(
+                                        f"yEnc filename is still a hash: {real_filename}"
+                                    )
+                                    continue  # Try next message ID
+                                else:
+                                    # Found a real filename!
+                                    release_name = real_filename
+                                    found_real_name = True
+                                    logger.info(
+                                        f"Successfully deobfuscated: {binary['name']} -> {release_name}"
+                                    )
+                                    break
 
-                        if release_name == binary["name"]:
+                        if not found_real_name:
+                            # All attempts yielded hash names - this is double-obfuscated
                             logger.warning(
-                                f"Could not deobfuscate binary: {binary['name']}"
+                                f"Double-obfuscated post detected: {binary['name']} - all yEnc filenames are hashes. SKIPPING."
                             )
+                            # Skip creating this release entirely
+                            continue
 
                     # Check if release already exists
                     from app.services.release import create_release_guid
