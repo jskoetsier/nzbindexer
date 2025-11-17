@@ -4,6 +4,19 @@ This roadmap outlines the planned features, improvements, and long-term vision f
 
 ## Version 1.x - Stability & Core Features (Current)
 
+### v0.9.0 ✅ - Advanced Deobfuscation System (November 2025)
+- [x] NZBHydra2 integration
+- [x] Multi-source deobfuscation pipeline (9 steps)
+- [x] ORN (Obfuscated Release Names) cache system
+- [x] ORN API endpoints (import/export, public sharing)
+- [x] Obfuscated release indexing (no more skipping!)
+- [x] Comprehensive ORN database building guide
+- [x] Setup assistant scripts
+- [x] PreDB integration (4 providers)
+- [x] Hash decoding (base64, hex, patterns)
+- [x] Archive header extraction
+- [x] NFO file extraction
+
 ### v1.0.0 ✅ - Fully Operational Release (January 2025)
 - [x] Day-based backfill system
 - [x] NNTP OVER dictionary format parsing
@@ -13,7 +26,7 @@ This roadmap outlines the planned features, improvements, and long-term vision f
 - [x] Release creation from complete binaries
 - [x] Admin UI for group management
 
-### v1.1.0 (Q1 2025) - Performance & Monitoring
+### v1.1.0 (Q1 2026) - Performance & Monitoring
 **Focus**: Improve performance and add monitoring capabilities
 
 #### Performance Improvements
@@ -401,6 +414,6 @@ This roadmap is a living document and community input is welcome!
 
 ---
 
-**Last Updated**: January 2025
-**Current Version**: 1.0.0
-**Next Release**: v1.1.0 (Q1 2025)
+**Last Updated**: November 2025
+**Current Version**: 0.9.0
+**Next Release**: v1.1.0 (Q1 2026)

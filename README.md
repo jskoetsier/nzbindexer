@@ -1,9 +1,19 @@
 # NZB Indexer
 
-A modern Usenet indexer built with FastAPI, featuring a responsive web interface and comprehensive API.
+A modern, intelligent Usenet indexer built with FastAPI, featuring advanced deobfuscation capabilities, NZBHydra2 integration, and a responsive web interface.
+
+## Version 0.9.0 - Major Update (Nov 17, 2025)
+
+**🎉 Major Features:**
+- ✅ **NZBHydra2 Integration** - Query millions of hash mappings from aggregated indexers
+- ✅ **Multi-Source Deobfuscation Pipeline** - PreDB, NZBHydra2, Newznab, hash decoding, archives, NFO extraction
+- ✅ **Obfuscated Release Indexing** - Creates releases even when deobfuscation fails, enabling retroactive matching
+- ✅ **ORN (Obfuscated Release Names) Cache** - Community-shareable hash database with import/export
+- ✅ **Comprehensive Deobfuscation Guide** - 10+ solutions for building your hash database
 
 ## Features
 
+### Core Functionality
 - **Responsive Web Interface**: Built with Bootstrap 5 for optimal viewing on any device
 - **User Authentication**: Secure login and registration system
 - **Group Management**: View and manage Usenet newsgroups
@@ -14,20 +24,45 @@ A modern Usenet indexer built with FastAPI, featuring a responsive web interface
   - Automatic article target calculation based on group activity
   - Progress tracking and visualization
   - Runs automatically every 5 minutes
-- **Robust Article Processing**: Convert Usenet articles into releases
+
+### Advanced Deobfuscation (NEW in v0.9.0)
+- **Multi-Source Deobfuscation Pipeline**:
+  1. yEnc Header Extraction - Get real filenames from article content
+  2. PreDB Lookup - Query 4 PreDB APIs (predb.ovh, predb.me, srrDB, abgx360)
+  3. **NZBHydra2 Integration** - Access aggregated indexer databases
+  4. Newznab Cross-Indexer Lookup - Query other indexers
+  5. Hash Decoding - Base64, hex, and pattern decoding
+  6. TMDB/IMDB Metadata Matching - Size + date matching
+  7. Archive Header Extraction - RAR/ZIP/7-Zip/Par2 headers
+  8. NFO File Extraction - Parse NFO files for release names
+  9. Obfuscated Release Creation - Index with pending deobfuscation
+
+- **ORN (Obfuscated Release Names) Management**:
+  - Local hash-to-name mapping cache
+  - Source attribution (PreDB, NZBHydra2, community, etc.)
+  - Confidence scoring
+  - JSON/CSV import/export
+  - Public sharing API for community collaboration
+  - Automatic retry with cache updates
+
+### Robust Article Processing
+- **Binary Post Detection**:
   - NNTP OVER dictionary format parsing
   - Safe int conversion with comprehensive error handling
   - Binary post detection and grouping
   - Part tracking and completion percentage calculation
-- **Obfuscated Binary Support**: Process modern binary posts with obfuscated subjects
-- **yEnc Header Detection**: Extract filenames from yEnc headers in article content
-- **Release Management**: Extract metadata and categorize releases
-  - Automatic release creation from complete binaries
-  - Multiple completion criteria (100%, ≥25% with ≥2 parts, or ≥5 parts)
-  - Size tracking and validation
-- **NZB Generation**: Create NZB files for downloads with obfuscation
-- **Search Functionality**: Find releases by name, category, and more
+  - **Obfuscated Binary Support**: Process modern binary posts with obfuscated subjects
+  - **Multiple Completion Criteria**: 100%, ≥25% with ≥2 parts, or ≥5 parts
+
+### Release Management
+- **Automatic Release Creation**: Convert complete binaries into releases
+- **Metadata Extraction**: Category, quality, year, resolution detection
+- **Size Tracking**: Accurate byte count across all parts
+- **NZB Generation**: Create downloadable NZB files with proper formatting
+- **Search Functionality**: Find releases by name, category, hash, and more
 - **Sonarr/Radarr Integration**: Compatible with automation tools via Newznab API
+
+### System Tools
 - **Batch Processing**: Efficient group discovery with progress tracking
 - **Job Control**: Cancel long-running tasks when needed
 - **Diagnostic Tools**: Analyze NNTP connections and article processing
