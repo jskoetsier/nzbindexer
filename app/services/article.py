@@ -577,6 +577,98 @@ class ArticleService:
         key = re.sub(r"[^a-z0-9]", "", key)
         return key
 
+    def _try_decode_obfuscated_filename(self, filename: str) -> Optional[str]:
+        """
+        Try to decode an obfuscated filename using various methods:
+        - Base64 decoding
+        - MD5/SHA1 hash lookups (not implemented yet, requires database)
+        - Pattern-based decoding
+        """
+        import base64
+
+        # Strip extensions to get the base name
+        name_parts = filename.rsplit(".", 1)
+        base_name = name_parts[0]
+        extension = "." + name_parts[1] if len(name_parts) > 1 else ""
+
+        # Try base64 decoding
+        try:
+            # Base64 strings are typically alphanumeric with + / = characters
+            # and have length divisible by 4 (with padding)
+            if len(base_name) >= 20 and re.match(r"^[A-Za-z0-9+/=_-]+$", base_name):
+                # Try standard base64
+                try:
+                    # Replace URL-safe characters
+                    normalized = base_name.replace("_", "/").replace("-", "+")
+                    # Add padding if needed
+                    padding = (4 - len(normalized) % 4) % 4
+                    normalized += "=" * padding
+
+                    decoded_bytes = base64.b64decode(normalized, validate=True)
+                    # Check if decoded bytes are printable ASCII
+                    decoded_str = decoded_bytes.decode("utf-8", errors="strict")
+
+                    # Validate decoded string looks like a real filename
+                    if (
+                        len(decoded_str) >= 5
+                        and len(decoded_str) < 200
+                        and re.search(r"[a-zA-Z]{3,}", decoded_str)
+                        and not decoded_str.startswith("http")
+                    ):
+                        logger.info(
+                            f"Successfully decoded base64 filename: {base_name} -> {decoded_str}"
+                        )
+                        return decoded_str + extension
+                except (base64.binascii.Error, UnicodeDecodeError, ValueError):
+                    pass
+
+                # Try URL-safe base64
+                try:
+                    decoded_bytes = base64.urlsafe_b64decode(
+                        base_name + "=" * ((4 - len(base_name) % 4) % 4)
+                    )
+                    decoded_str = decoded_bytes.decode("utf-8", errors="strict")
+
+                    if (
+                        len(decoded_str) >= 5
+                        and len(decoded_str) < 200
+                        and re.search(r"[a-zA-Z]{3,}", decoded_str)
+                        and not decoded_str.startswith("http")
+                    ):
+                        logger.info(
+                            f"Successfully decoded URL-safe base64 filename: {base_name} -> {decoded_str}"
+                        )
+                        return decoded_str + extension
+                except (base64.binascii.Error, UnicodeDecodeError, ValueError):
+                    pass
+        except Exception as e:
+            logger.debug(f"Error trying base64 decode on {filename}: {str(e)}")
+
+        # Try hex decoding (if it's all hex characters)
+        try:
+            if (
+                len(base_name) >= 20
+                and re.match(r"^[a-fA-F0-9]+$", base_name)
+                and len(base_name) % 2 == 0
+            ):
+                decoded_bytes = bytes.fromhex(base_name)
+                decoded_str = decoded_bytes.decode("utf-8", errors="strict")
+
+                if (
+                    len(decoded_str) >= 5
+                    and len(decoded_str) < 200
+                    and re.search(r"[a-zA-Z]{3,}", decoded_str)
+                    and not decoded_str.startswith("http")
+                ):
+                    logger.info(
+                        f"Successfully decoded hex filename: {base_name} -> {decoded_str}"
+                    )
+                    return decoded_str + extension
+        except (ValueError, UnicodeDecodeError):
+            pass
+
+        return None
+
     async def _get_real_filename_from_yenc(self, message_id: str) -> Optional[str]:
         """
         Fetch the real filename from yEnc headers for an obfuscated post
@@ -599,6 +691,17 @@ class ArticleService:
                         logger.info(
                             f"Deobfuscated filename from yEnc header: {filename}"
                         )
+
+                        # Try to decode the filename if it still looks obfuscated
+                        decoded_filename = self._try_decode_obfuscated_filename(
+                            filename
+                        )
+                        if decoded_filename:
+                            logger.info(
+                                f"Decoded obfuscated yEnc filename: {filename} -> {decoded_filename}"
+                            )
+                            return decoded_filename
+
                         return filename
 
             logger.debug(f"No yEnc header found in message_id: {message_id}")
@@ -860,31 +963,54 @@ class ArticleService:
                             # Strip extensions and part numbers iteratively
                             # This handles cases like .part03.rar, .vol001+02.par2, etc.
                             name_no_ext = filename
-                            
+
                             # Keep stripping extensions until no more matches
                             while True:
                                 before = name_no_ext
                                 # Strip common extensions
-                                name_no_ext = re.sub(r'\.(rar|par2?|zip|7z|nfo|sfv)$', '', name_no_ext, flags=re.IGNORECASE)
+                                name_no_ext = re.sub(
+                                    r"\.(rar|par2?|zip|7z|nfo|sfv)$",
+                                    "",
+                                    name_no_ext,
+                                    flags=re.IGNORECASE,
+                                )
                                 # Strip .partXX pattern (with or without trailing extension)
-                                name_no_ext = re.sub(r'\.part\d+', '', name_no_ext, flags=re.IGNORECASE)
+                                name_no_ext = re.sub(
+                                    r"\.part\d+", "", name_no_ext, flags=re.IGNORECASE
+                                )
                                 # Strip .rXX pattern (split rar archives)
-                                name_no_ext = re.sub(r'\.r\d+', '', name_no_ext, flags=re.IGNORECASE)
+                                name_no_ext = re.sub(
+                                    r"\.r\d+", "", name_no_ext, flags=re.IGNORECASE
+                                )
                                 # Strip .volXX+YY pattern (par2 volumes)
-                                name_no_ext = re.sub(r'\.vol\d+\+?\d*', '', name_no_ext, flags=re.IGNORECASE)
+                                name_no_ext = re.sub(
+                                    r"\.vol\d+\+?\d*",
+                                    "",
+                                    name_no_ext,
+                                    flags=re.IGNORECASE,
+                                )
                                 # If nothing changed, we're done
                                 if name_no_ext == before:
                                     break
-                            
+
                             # Clean up any remaining dots or dashes at start/end
-                            name_no_ext = name_no_ext.strip('.-_')
-                            
+                            name_no_ext = name_no_ext.strip(".-_")
+
                             # Check for hash patterns
                             return bool(
-                                re.match(r'^[a-fA-F0-9]{16,}$', name_no_ext) or  # Hex hash (16+ chars)
-                                re.match(r'^[a-zA-Z0-9]{18,}$', name_no_ext) or  # Alphanumeric only (18+ chars, no dashes/underscores)
-                                re.match(r'^[a-zA-Z0-9_-]{22,}$', name_no_ext) or  # Base64-like with separators (22+ chars)
-                                (len(name_no_ext) < 10 and not re.search(r'[a-z]{3,}', name_no_ext.lower()))  # Too short and no real words
+                                re.match(
+                                    r"^[a-fA-F0-9]{16,}$", name_no_ext
+                                )  # Hex hash (16+ chars)
+                                or re.match(
+                                    r"^[a-zA-Z0-9]{18,}$", name_no_ext
+                                )  # Alphanumeric only (18+ chars, no dashes/underscores)
+                                or re.match(
+                                    r"^[a-zA-Z0-9_-]{22,}$", name_no_ext
+                                )  # Base64-like with separators (22+ chars)
+                                or (
+                                    len(name_no_ext) < 10
+                                    and not re.search(r"[a-z]{3,}", name_no_ext.lower())
+                                )  # Too short and no real words
                             )
 
                         # Try up to 10 message IDs to find a non-hash filename
