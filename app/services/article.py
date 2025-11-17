@@ -608,6 +608,146 @@ class ArticleService:
             logger.warning(f"Error fetching yEnc filename for {message_id}: {str(e)}")
             return None
 
+    async def _extract_release_name_from_nfo(self, binary: Dict) -> Optional[str]:
+        """
+        Extract the real release name from NFO files in the binary
+        NFO files typically contain release information that can help deobfuscate
+        """
+        try:
+            # Look for .nfo files in the binary parts
+            nfo_message_ids = []
+            
+            for part_num, part_info in binary.get("parts", {}).items():
+                subject = part_info.get("subject", "")
+                message_id = part_info.get("message_id", "")
+                
+                # Check if this part contains an NFO file
+                if ".nfo" in subject.lower() or "nfo" in subject.lower():
+                    nfo_message_ids.append((message_id, subject))
+                    logger.info(f"Found potential NFO file in part {part_num}: {subject}")
+            
+            # Try to download and parse NFO files
+            for message_id, subject in nfo_message_ids[:3]:  # Try first 3 NFO files
+                try:
+                    # Get yEnc filename first
+                    yenc_filename = await self._get_real_filename_from_yenc(message_id)
+                    
+                    if yenc_filename and ".nfo" in yenc_filename.lower():
+                        # Get the article body
+                        body_lines = await self.nntp_service.get_article_body(message_id)
+                        
+                        if body_lines:
+                            # Decode yEnc content
+                            nfo_content = self._decode_yenc_body(body_lines)
+                            
+                            if nfo_content:
+                                # Parse NFO for release name
+                                release_name = self._parse_nfo_for_release_name(nfo_content)
+                                
+                                if release_name:
+                                    logger.info(
+                                        f"Successfully extracted release name from NFO: {release_name}"
+                                    )
+                                    return release_name
+                
+                except Exception as e:
+                    logger.debug(f"Error processing NFO {message_id}: {str(e)}")
+                    continue
+            
+            logger.debug("No usable NFO files found or could not extract release name")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error extracting release name from NFO: {str(e)}")
+            return None
+
+    def _decode_yenc_body(self, body_lines: List[str]) -> Optional[str]:
+        """
+        Decode yEnc encoded body to get the actual content
+        Simple implementation - just tries to decode the content
+        """
+        try:
+            decoded_bytes = bytearray()
+            in_yenc_data = False
+            
+            for line in body_lines:
+                line = line.strip()
+                
+                if line.startswith("=ybegin"):
+                    in_yenc_data = True
+                    continue
+                elif line.startswith("=yend"):
+                    break
+                elif line.startswith("=ypart"):
+                    continue
+                    
+                if in_yenc_data and line and not line.startswith("="):
+                    # Basic yEnc decoding: subtract 42 from each byte
+                    for char in line:
+                        byte_val = ord(char)
+                        # Handle yEnc escape sequences (=)
+                        if char == '=':
+                            continue
+                        decoded_byte = (byte_val - 42) % 256
+                        decoded_bytes.append(decoded_byte)
+            
+            # Try to decode as ASCII/UTF-8
+            try:
+                content = decoded_bytes.decode('utf-8', errors='ignore')
+                return content
+            except:
+                content = decoded_bytes.decode('latin-1', errors='ignore')
+                return content
+                
+        except Exception as e:
+            logger.debug(f"Error decoding yEnc body: {str(e)}")
+            return None
+
+    def _parse_nfo_for_release_name(self, nfo_content: str) -> Optional[str]:
+        """
+        Parse NFO content to extract the release name
+        Looks for common patterns in NFO files
+        """
+        try:
+            # Common patterns in NFO files
+            patterns = [
+                r'Release[:\s]+(.+)',
+                r'Title[:\s]+(.+)',
+                r'Name[:\s]+(.+)',
+                r'(\S+\.\S+\.\S+\.\S+)',  # Dotted release name pattern
+                r'━+\s*(.+?)\s*━+',  # Text between box drawing characters
+                r'═+\s*(.+?)\s*═+',  # Text between double lines
+            ]
+            
+            lines = nfo_content.split('\n')
+            
+            # Look for release name patterns
+            for pattern in patterns:
+                for line in lines[:100]:  # Check first 100 lines
+                    line = line.strip()
+                    match = re.search(pattern, line, re.IGNORECASE)
+                    if match:
+                        potential_name = match.group(1).strip()
+                        
+                        # Clean up the name
+                        potential_name = re.sub(r'[^\w\s\.\-\(\)]', '', potential_name)
+                        potential_name = potential_name.strip()
+                        
+                        # Validate it looks like a release name
+                        if (len(potential_name) > 10 and 
+                            len(potential_name) < 200 and
+                            not potential_name.startswith('http') and
+                            '.' in potential_name):
+                            
+                            logger.info(f"Found potential release name in NFO: {potential_name}")
+                            return potential_name
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error parsing NFO content: {str(e)}")
+            return None
+
     async def _process_binaries_to_releases(
         self,
         db: AsyncSession,
@@ -707,20 +847,22 @@ class ArticleService:
                         # Helper function to check if a filename is still a hash
                         def is_filename_hash(filename: str) -> bool:
                             """Check if a filename (after deobfuscation) is still a hash"""
-                            # Strip extensions
+                            # Strip extensions and part numbers
                             name_no_ext = re.sub(
-                                r"\.(rar|par2?|zip|7z|r\d+|vol\d+)$",
-                                "",
-                                filename,
-                                flags=re.IGNORECASE,
+                                r'\.(rar|par2?|zip|7z|r\d+|vol\d+|part\d+)$', 
+                                '', 
+                                filename, 
+                                flags=re.IGNORECASE
                             )
-
+                            # Also strip .partXX. pattern
+                            name_no_ext = re.sub(r'\.part\d+\.', '.', name_no_ext, flags=re.IGNORECASE)
+                            
                             # Check for hash patterns
                             return bool(
-                                re.match(r"^[a-fA-F0-9]{16,}$", name_no_ext)  # Hex hash
-                                or re.match(
-                                    r"^[a-zA-Z0-9_-]{22,}$", name_no_ext
-                                )  # Base64-like
+                                re.match(r'^[a-fA-F0-9]{16,}$', name_no_ext) or  # Hex hash (16+ chars)
+                                re.match(r'^[a-zA-Z0-9]{18,}$', name_no_ext) or  # Alphanumeric only (18+ chars, no dashes/underscores)
+                                re.match(r'^[a-zA-Z0-9_-]{22,}$', name_no_ext) or  # Base64-like with separators (22+ chars)
+                                (len(name_no_ext) < 10 and not re.search(r'[a-z]{3,}', name_no_ext.lower()))  # Too short and no real words
                             )
 
                         # Try up to 10 message IDs to find a non-hash filename
@@ -746,12 +888,25 @@ class ArticleService:
                                     break
 
                         if not found_real_name:
-                            # All attempts yielded hash names - this is double-obfuscated
-                            logger.warning(
-                                f"Double-obfuscated post detected: {binary['name']} - all yEnc filenames are hashes. SKIPPING."
+                            # All yEnc attempts yielded hash names - try NFO files
+                            logger.info(
+                                f"All yEnc filenames are hashes, trying NFO extraction for {binary['name']}"
                             )
-                            # Skip creating this release entirely
-                            continue
+                            nfo_release_name = await self._extract_release_name_from_nfo(binary)
+                            
+                            if nfo_release_name:
+                                release_name = nfo_release_name
+                                found_real_name = True
+                                logger.info(
+                                    f"Successfully extracted from NFO: {binary['name']} -> {release_name}"
+                                )
+                            else:
+                                # Double-obfuscated with no NFO - skip this release
+                                logger.warning(
+                                    f"Double-obfuscated post detected: {binary['name']} - all yEnc filenames are hashes and no NFO found. SKIPPING."
+                                )
+                                # Skip creating this release entirely
+                                continue
 
                     # Check if release already exists
                     from app.services.release import create_release_guid
