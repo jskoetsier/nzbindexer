@@ -1081,6 +1081,26 @@ class ArticleService:
                                         f"yEnc filename is still obfuscated: {real_filename}"
                                     )
 
+                                    # Try PreDB lookup first (most likely to succeed for ultra-obfuscated posts)
+                                    from app.services.predb import PreDBService
+
+                                    predb_service = PreDBService(db)
+                                    try:
+                                        predb_result = (
+                                            await predb_service.lookup_obfuscated_name(
+                                                real_filename
+                                            )
+                                        )
+                                        if predb_result:
+                                            release_name = predb_result
+                                            found_real_name = True
+                                            logger.info(
+                                                f"Successfully deobfuscated via PreDB: {binary['name']} -> {release_name}"
+                                            )
+                                            break
+                                    finally:
+                                        await predb_service.close()
+
                                     # Try to decode the hash
                                     decoded = (
                                         self.deobfuscation_service.try_decode_hash(

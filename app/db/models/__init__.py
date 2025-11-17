@@ -7,6 +7,7 @@ from app.db.models.group import Group
 from app.db.models.release import Release
 from app.db.models.setting import Setting
 from app.db.models.user import User
+from app.db.models.orn_mapping import ORNMapping
 
 # Export models for easy import
-__all__ = ["Base", "User", "Group", "Category", "Release", "Setting"]
+__all__ = ["Base", "User", "Group", "Category", "Release", "Setting", "ORNMapping"]

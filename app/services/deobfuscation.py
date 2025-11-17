@@ -9,13 +9,14 @@ This module provides comprehensive methods for deobfuscating filenames including
 - PreDB (Pre-Release Database) lookups
 """
 
+import asyncio
+import base64
 import logging
 import re
 import struct
 from typing import List, Optional, Tuple
-import base64
+
 import aiohttp
-import asyncio
 
 logger = logging.getLogger(__name__)
 
