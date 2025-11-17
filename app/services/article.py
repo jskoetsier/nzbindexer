@@ -1066,97 +1066,107 @@ class ArticleService:
                         )
 
                         found_real_name = False
-                        for message_id in binary["message_ids"][:10]:
-                            # Get yEnc filename first
-                            real_filename = await self._get_real_filename_from_yenc(
-                                message_id
-                            )
-
-                            if real_filename:
-                                # Check if deobfuscated filename is still a hash
-                                if self.deobfuscation_service.is_obfuscated_hash(
-                                    real_filename
-                                ):
-                                    logger.debug(
-                                        f"yEnc filename is still obfuscated: {real_filename}"
-                                    )
-
-                                    # Try PreDB lookup first (most likely to succeed for ultra-obfuscated posts)
-                                    from app.services.predb import PreDBService
-
-                                    predb_service = PreDBService(db)
-                                    try:
-                                        predb_result = (
-                                            await predb_service.lookup_obfuscated_name(
-                                                real_filename
-                                            )
-                                        )
-                                        if predb_result:
-                                            release_name = predb_result
-                                            found_real_name = True
-                                            logger.info(
-                                                f"Successfully deobfuscated via PreDB: {binary['name']} -> {release_name}"
-                                            )
-                                            break
-                                    finally:
-                                        await predb_service.close()
-
-                                    # Try to decode the hash
-                                    decoded = (
-                                        self.deobfuscation_service.try_decode_hash(
-                                            real_filename
-                                        )
-                                    )
-                                    if decoded:
-                                        release_name = decoded
-                                        found_real_name = True
-                                        logger.info(
-                                            f"Successfully decoded hash: {binary['name']} -> {release_name}"
-                                        )
-                                        break
-
-                                    # Try to extract from archive headers
-                                    body_lines = (
-                                        await self.nntp_service.get_article_body(
-                                            message_id
-                                        )
-                                    )
-                                    if body_lines:
-                                        extracted = self.deobfuscation_service.extract_filename_from_article(
-                                            body_lines, real_filename
-                                        )
-                                        if (
-                                            extracted
-                                            and not self.deobfuscation_service.is_obfuscated_hash(
-                                                extracted
-                                            )
-                                        ):
-                                            release_name = extracted
-                                            found_real_name = True
-                                            logger.info(
-                                                f"Successfully extracted from archive: {binary['name']} -> {release_name}"
-                                            )
-                                            break
-
-                                    # Continue to next message ID
-                                    continue
-                                else:
-                                    # Found a real filename!
-                                    release_name = real_filename
+                        yenc_filename = None
+                          
+                        # Step 1: Get yEnc filename from first article
+                        for message_id in binary["message_ids"][:3]:
+                            yenc_filename = await self._get_real_filename_from_yenc(message_id)
+                            if yenc_filename:
+                                logger.debug(f"Found yEnc filename: {yenc_filename}")
+                                break
+                          
+                        # If no yEnc filename, use the binary name itself
+                        search_hash = yenc_filename or binary["name"]
+                          
+                        # Step 2: Try PreDB lookup (FIRST - fastest and most reliable)
+                        if self.deobfuscation_service.is_obfuscated_hash(search_hash):
+                            logger.info(f"Trying PreDB lookup for: {search_hash}")
+                            from app.services.predb import PreDBService
+                              
+                            predb_service = PreDBService(db)
+                            try:
+                                predb_result = await predb_service.lookup_obfuscated_name(search_hash)
+                                if predb_result:
+                                    release_name = predb_result
                                     found_real_name = True
                                     logger.info(
-                                        f"Successfully deobfuscated: {binary['name']} -> {release_name}"
+                                        f"✓ PreDB SUCCESS: {binary['name']} -> {release_name}"
                                     )
-                                    break
-
+                            except Exception as e:
+                                logger.warning(f"PreDB lookup error: {e}")
+                            finally:
+                                await predb_service.close()
+                          
+                        # Step 3: Try Newznab cross-indexer lookup (if PreDB failed)
+                        if not found_real_name and self.deobfuscation_service.is_obfuscated_hash(search_hash):
+                            logger.info(f"Trying Newznab lookup for: {search_hash}")
+                            # TODO: Configure Newznab indexers in settings
+                            # from app.services.newznab import NewznabPool
+                            # newznab_pool = NewznabPool()
+                            # newznab_result = await newznab_pool.lookup_by_hash(search_hash)
+                            # if newznab_result:
+                            #     release_name = newznab_result
+                            #     found_real_name = True
+                            #     logger.info(f"✓ NEWZNAB SUCCESS: {binary['name']} -> {release_name}")
+                          
+                        # Step 4: Try hash decoding (base64, hex, etc.)
+                        if not found_real_name and yenc_filename:
+                            decoded = self.deobfuscation_service.try_decode_hash(yenc_filename)
+                            if decoded:
+                                release_name = decoded
+                                found_real_name = True
+                                logger.info(
+                                    f"✓ HASH DECODE SUCCESS: {binary['name']} -> {release_name}"
+                                )
+                          
+                        # Step 5: Try TMDB metadata matching (if partial info available)
+                        if not found_real_name and yenc_filename and not self.deobfuscation_service.is_obfuscated_hash(yenc_filename):
+                            logger.info(f"Trying TMDB matching for: {yenc_filename}")
+                            # TODO: Configure TMDB API key in settings
+                            # from app.services.metadata import MetadataService
+                            # metadata_service = MetadataService(tmdb_api_key="YOUR_KEY")
+                            # tmdb_result = await metadata_service.match_release(yenc_filename)
+                            # if tmdb_result:
+                            #     release_name = tmdb_result
+                            #     found_real_name = True
+                            #     logger.info(f"✓ TMDB SUCCESS: {binary['name']} -> {release_name}")
+                          
+                        # Step 6: Try archive header extraction (requires downloading article)
+                        if not found_real_name and yenc_filename:
+                            for message_id in binary["message_ids"][:5]:
+                                body_lines = await self.nntp_service.get_article_body(message_id)
+                                if body_lines:
+                                    extracted = self.deobfuscation_service.extract_filename_from_article(
+                                        body_lines, yenc_filename
+                                    )
+                                    if extracted and not self.deobfuscation_service.is_obfuscated_hash(extracted):
+                                        release_name = extracted
+                                        found_real_name = True
+                                        logger.info(
+                                            f"✓ ARCHIVE EXTRACTION SUCCESS: {binary['name']} -> {release_name}"
+                                        )
+                                        break
+                          
+                        # Step 7: Try NFO extraction (last resort)
                         if not found_real_name:
-                            # All methods failed - try NFO files
                             logger.info(
-                                f"Standard deobfuscation failed, trying NFO extraction for {binary['name']}"
+                                f"All deobfuscation methods failed, trying NFO extraction for {binary['name']}"
                             )
-                            nfo_release_name = (
-                                await self._extract_release_name_from_nfo(binary)
+                            nfo_release_name = await self._extract_release_name_from_nfo(binary)
+                              
+                            if nfo_release_name:
+                                release_name = nfo_release_name
+                                found_real_name = True
+                                logger.info(
+                                    f"✓ NFO EXTRACTION SUCCESS: {binary['name']} -> {release_name}"
+                                )
+                          
+                        # If nothing worked, skip this binary
+                        if not found_real_name:
+                            logger.warning(
+                                f"✗ COMPLETE FAILURE: {binary['name']} - tried PreDB, hash decode, archive, NFO. SKIPPING."
                             )
+                            continue
 
                             if nfo_release_name:
                                 release_name = nfo_release_name
