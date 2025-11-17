@@ -2,10 +2,10 @@
 NNTP service for connecting to Usenet servers and retrieving newsgroups
 """
 
-from datetime import datetime, timezone
 import logging
 import nntplib
 import re
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple, Union
 
 from app.core.config import settings
@@ -130,15 +130,15 @@ class NNTPService:
         try:
             conn = self.connect()
             resp, info = conn.body(message_id)
-            
+
             # Convert bytes to strings if needed
             lines = []
             for line in info.lines:
                 if isinstance(line, bytes):
-                    lines.append(line.decode('utf-8', errors='replace'))
+                    lines.append(line.decode("utf-8", errors="replace"))
                 else:
                     lines.append(line)
-            
+
             conn.quit()
             return lines
         except Exception as e:

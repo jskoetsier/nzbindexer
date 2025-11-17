@@ -225,19 +225,57 @@ async def browse(
     releases = releases_data["items"]
 
     # Build pagination URLs with all parameters
-    def build_url(p):
-        url = f"/browse?page={p}"
+    def build_url(page_num):
+        """Build URL for a specific page"""
+        params = {"page": page_num}
         if search:
-            url += f"&search={search}"
+            params["search"] = search
         if category_id:
-            url += f"&category_id={category_id}"
+            params["category_id"] = category_id
         if group_id:
-            url += f"&group_id={group_id}"
-        if sort_by != "added_date":
-            url += f"&sort_by={sort_by}"
-        if not sort_desc:
-            url += f"&sort_desc=false"
+            params["group_id"] = group_id
+        if sort_by:
+            params["sort_by"] = sort_by
+        if sort_desc:
+            params["sort_desc"] = sort_desc
+
+        url = "/browse?" + "&".join([f"{k}={v}" for k, v in params.items()])
         return url
+
+    def iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2):
+        """
+        Generate page numbers for pagination with smart truncation
+        Returns None for gaps where ellipsis should be shown
+        """
+        last = (total + per_page - 1) // per_page
+
+        # If there are few enough pages, just show them all
+        if last <= (left_edge + left_current + right_current + right_edge + 2):
+            yield from range(1, last + 1)
+            return
+
+        # Calculate which pages to show
+        left_range = range(1, left_edge + 1)
+        right_range = range(last - right_edge + 1, last + 1)
+        current_left_range = range(max(1, page - left_current), page + 1)
+        current_right_range = range(page + 1, min(last, page + right_current) + 1)
+
+        # Combine ranges and sort
+        pages_to_show = (
+            set(left_range)
+            | set(right_range)
+            | set(current_left_range)
+            | set(current_right_range)
+        )
+        pages_list = sorted(pages_to_show)
+
+        # Yield pages with None for gaps
+        prev_page = 0
+        for page_num in pages_list:
+            if page_num - prev_page > 1:
+                yield None  # Gap for ellipsis
+            yield page_num
+            prev_page = page_num
 
     pagination = {
         "page": page,
@@ -250,7 +288,7 @@ async def browse(
         "next_url": (
             build_url(page + 1) if page < ((total + per_page - 1) // per_page) else None
         ),
-        "iter_pages": lambda: range(1, ((total + per_page - 1) // per_page) + 1),
+        "iter_pages": iter_pages,
         "url_for_page": build_url,
     }
 
