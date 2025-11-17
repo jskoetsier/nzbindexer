@@ -635,9 +635,7 @@ class ArticleService:
                         size=binary["size"],
                         files=len(binary["parts"]),
                         completion=completion,
-                        posted_date=datetime.now(
-                            timezone.utc
-                        ),  # Should use article date
+                        posted_date=datetime.utcnow(),  # Use timezone-naive datetime to match DB schema
                         status=1,  # Active
                         passworded=0,  # Unknown
                         category_id=default_category.id,
