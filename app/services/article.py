@@ -669,9 +669,106 @@ class ArticleService:
 
         return None
 
+    def _extract_filename_from_rar_header(self, body_lines: List[str]) -> Optional[str]:
+        """
+        Extract the real filename from RAR archive headers
+        RAR files contain the original filename in their headers
+        """
+        try:
+            # Decode yEnc to get the RAR file data
+            decoded_bytes = bytearray()
+            in_yenc_data = False
+            escape_next = False
+            
+            for line in body_lines[:300]:  # Check first 300 lines for performance
+                line = line.strip()
+                
+                if line.startswith("=ybegin"):
+                    in_yenc_data = True
+                    continue
+                elif line.startswith("=yend"):
+                    break
+                elif line.startswith("=ypart"):
+                    continue
+                
+                if in_yenc_data and line and not line.startswith("="):
+                    # yEnc decoding: subtract 42 from each byte, handle escapes
+                    for char in line:
+                        if escape_next:
+                            # Escaped character: subtract 64 instead of 42
+                            byte_val = (ord(char) - 64) % 256
+                            decoded_bytes.append(byte_val)
+                            escape_next = False
+                        elif char == '=':
+                            # Next character is escaped
+                            escape_next = True
+                        else:
+                            byte_val = (ord(char) - 42) % 256
+                            decoded_bytes.append(byte_val)
+                
+                # Stop if we have enough data (RAR header is in first ~2-4KB)
+                if len(decoded_bytes) > 4096:
+                    break
+            
+            data = bytes(decoded_bytes)
+            
+            # Check for RAR signature: Rar!
+            if len(data) < 7 or data[:4] != b'Rar!':
+                logger.debug("Not a RAR file or header not found")
+                return None
+            
+            logger.debug(f"Found RAR signature, attempting to extract filename...")
+            
+            # RAR 5.x signature: Rar!\x1a\x07\x01\x00
+            # RAR 4.x signature: Rar!\x1a\x07\x00
+            
+            # Try to find file header by scanning for printable filename strings
+            # This works for both RAR4 and RAR5 formats
+            for offset in range(7, min(len(data) - 50, 2048)):
+                # Look for continuous printable ASCII sequences (potential filenames)
+                if data[offset] >= 0x20 and data[offset] <= 0x7E:
+                    filename_bytes = bytearray()
+                    for i in range(offset, min(offset + 256, len(data))):
+                        byte = data[i]
+                        # Collect printable ASCII characters
+                        if byte >= 0x20 and byte <= 0x7E:
+                            filename_bytes.append(byte)
+                        elif byte == 0:
+                            # Null terminator - end of string
+                            break
+                        else:
+                            # Non-printable character - stop if we have enough
+                            if len(filename_bytes) >= 10:
+                                break
+                            else:
+                                filename_bytes = bytearray()  # Reset
+                                break
+                    
+                    if len(filename_bytes) >= 10 and len(filename_bytes) < 200:
+                        try:
+                            filename = filename_bytes.decode('utf-8')
+                            # Check if it looks like a valid filename with extension
+                            if ('.' in filename and 
+                                re.search(r'[a-zA-Z]{3,}', filename) and
+                                not filename.startswith('http') and
+                                # Check for common archive extensions
+                                re.search(r'\.(rar|r\d{2}|zip|7z|mkv|mp4|avi|iso|nfo|part\d+)', filename, re.IGNORECASE)):
+                                logger.info(f"Extracted filename from RAR header: {filename}")
+                                return filename
+                        except UnicodeDecodeError:
+                            pass
+            
+            logger.debug("Could not extract filename from RAR header")
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error extracting RAR filename: {str(e)}")
+            return None
+
     async def _get_real_filename_from_yenc(self, message_id: str) -> Optional[str]:
         """
         Fetch the real filename from yEnc headers for an obfuscated post
+        Enhanced to try RAR header extraction if yEnc filename is obfuscated
         """
         try:
             # Get the article body
@@ -1023,8 +1120,19 @@ class ArticleService:
                                 # Check if this "deobfuscated" name is still a hash
                                 if is_filename_hash(real_filename):
                                     logger.debug(
-                                        f"yEnc filename is still a hash: {real_filename}"
+                                        f"yEnc filename is still a hash: {real_filename}, trying RAR header extraction..."
                                     )
+                                    # Try to extract filename from RAR header
+                                    body_lines = await self.nntp_service.get_article_body(message_id)
+                                    if body_lines:
+                                        rar_filename = self._extract_filename_from_rar_header(body_lines)
+                                        if rar_filename and not is_filename_hash(rar_filename):
+                                            release_name = rar_filename
+                                            found_real_name = True
+                                            logger.info(
+                                                f"Successfully deobfuscated from RAR header: {binary['name']} -> {release_name}"
+                                            )
+                                            break
                                     continue  # Try next message ID
                                 else:
                                     # Found a real filename!
