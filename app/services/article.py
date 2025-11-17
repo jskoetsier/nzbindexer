@@ -280,32 +280,30 @@ class ArticleService:
 
         # If subject parsing succeeded, we have a clean/traditional post
         if binary_name and part_num:
-            logger.debug(
-                f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}"
-            )
+            logger.debug(f"Parsed binary from subject: {binary_name} part {part_num}/{total_parts}")
         else:
             # Subject parsing failed - this is likely an obfuscated post
             # For obfuscated posts, we'll use the subject itself as a placeholder
-            # and rely on yEnc headers in the article body
-
+            
             # Check if this looks like a binary post at all
-            has_binary_indicators = any(
-                [
-                    "yenc" in subject.lower(),
-                    "yEnc" in subject,
-                    re.search(r"\[\d+/\d+\]", subject),  # Has part indicator
-                    re.search(r"\(\d+/\d+\)", subject),  # Has part indicator
-                    bytes_count > 10000,  # Large enough to be binary
-                ]
-            )
-
+            # Be VERY permissive here - most Usenet posts ARE binary
+            has_binary_indicators = any([
+                'yenc' in subject.lower(),
+                'yEnc' in subject,
+                re.search(r'\[\d+/\d+\]', subject),  # Has part indicator [01/50]
+                re.search(r'\(\d+/\d+\)', subject),   # Has part indicator (01/50)
+                re.search(r'\d+/\d+', subject),       # Has any number pattern like 01/50
+                bytes_count > 1000,  # Fairly small threshold (1KB)
+                len(subject) > 10,  # Has some subject text
+            ])
+            
             if not has_binary_indicators:
                 # Not a binary post, skip silently
                 return
-
+                
             # This appears to be an obfuscated binary post
             # Extract part numbers from subject if available
-            part_match = re.search(r"[\[\(](\d+)/(\d+)[\]\)]", subject)
+            part_match = re.search(r'[\[\(]?(\d+)/(\d+)[\]\)]?', subject)
             if part_match:
                 part_num = int(part_match.group(1))
                 total_parts = int(part_match.group(2))
@@ -313,19 +311,16 @@ class ArticleService:
                 # No part info in subject, assume single part for now
                 part_num = 1
                 total_parts = 1
-
-            # For obfuscated posts, use message_id as the binary key initially
-            # We'll update this later when we have the real filename from yEnc headers
-            # Use a hash of the subject line minus the part numbers as the binary name
+            
+            # For obfuscated posts, use a hash of the subject line minus the part numbers as the binary name
             # This groups parts of the same post together
-            subject_base = re.sub(r"[\[\(]\d+/\d+[\]\)]", "", subject).strip()
-            binary_name = (
-                f"obfuscated_{hash(subject_base) & 0x7FFFFFFF}"  # Positive hash
-            )
-
-            logger.debug(
-                f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}"
-            )
+            subject_base = re.sub(r'[\[\(]?\d+/\d+[\]\)]?', '', subject).strip()
+            if len(subject_base) < 3:
+                # Subject is too short after removing part numbers - use message_id hash instead
+                subject_base = message_id
+            binary_name = f"obfuscated_{hash(subject_base) & 0x7FFFFFFF}"  # Positive hash
+            
+            logger.debug(f"Detected obfuscated post: {subject} -> {binary_name} part {part_num}/{total_parts}")
 
         # Create or update binary entry
         binary_key = self._get_binary_key(binary_name)
@@ -336,9 +331,7 @@ class ArticleService:
                 "parts": {},
                 "total_parts": total_parts or 0,
                 "size": 0,
-                "obfuscated": binary_name.startswith(
-                    "obfuscated_"
-                ),  # Track if this is obfuscated
+                "obfuscated": binary_name.startswith("obfuscated_"),  # Track if this is obfuscated
                 "message_ids": [],  # Store message IDs for later yEnc header fetching
             }
             binary_subjects[binary_key] = subject
@@ -352,6 +345,13 @@ class ArticleService:
             }
             binaries[binary_key]["size"] += bytes_count
             binaries[binary_key]["message_ids"].append(message_id)
+
+        # Update total parts if we have a new value
+        if total_parts and binaries[binary_key]["total_parts"] < total_parts:
+            binaries[binary_key]["total_parts"] = total_parts
+
+        # Return binary info for logging
+        return f"{binary_name} (part {part_num}/{total_parts})"
 
         # Update total parts if we have a new value
         if total_parts and binaries[binary_key]["total_parts"] < total_parts:
