@@ -364,10 +364,14 @@ class ArticleService:
                 r"\s*yEnc.*$", "", subject_base, flags=re.IGNORECASE
             ).strip()
 
-            # Check if this is a hash-like obfuscated name (hex string of 16+ chars or similar patterns)
+            # Check if this is a hash-like obfuscated name
+            # Strip common extensions first
+            subject_no_ext = re.sub(r'\.(rar|par2?|zip|7z|r\d+|vol\d+)$', '', subject_base, flags=re.IGNORECASE)
+            
             is_hash_name = (
-                re.match(r'^[a-fA-F0-9]{16,}$', subject_base) or  # Hex hash
-                re.match(r'^[a-zA-Z0-9_-]{20,}$', subject_base) or  # Base64-like
+                re.match(r'^[a-fA-F0-9]{16,}$', subject_no_ext) or  # Hex hash (16+ chars)
+                re.match(r'^[a-fA-F0-9]{16,}$', subject_base) or  # Hex hash with extension
+                re.match(r'^[a-zA-Z0-9_-]{22,}$', subject_no_ext) or  # Base64-like (22+ chars, no spaces)
                 len(subject_base) < 10  # Too short
             )
 
