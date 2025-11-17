@@ -154,15 +154,23 @@ class ArticleService:
                                     other,
                                 ) = article
                             elif len(article) == 2:
-                                # Some NNTP servers return only article number and message ID
-                                article_num, message_id = article
-                                subject = ""
-                                from_addr = ""
-                                date = None
-                                references = ""
-                                bytes_count = 0
-                                lines_count = 0
+                                # CRITICAL FIX: NNTP OVER command returns a dict, not a simple tuple!
+                                # The second element is a dictionary with all the header info
+                                article_num, headers_dict = article
+                                
+                                # Extract fields from the dictionary
+                                subject = headers_dict.get('subject', '')
+                                from_addr = headers_dict.get('from', '')
+                                date_str = headers_dict.get('date', '')
+                                message_id = headers_dict.get('message-id', '')
+                                references = headers_dict.get('references', '')
+                                bytes_count = int(headers_dict.get(':bytes', 0))
+                                lines_count = int(headers_dict.get(':lines', 0))
                                 other = {}
+                                
+                                # Log successful extraction for first few articles
+                                if stats["processed"] < 3:
+                                    logger.info(f"[FIX] Extracted from dict: article={article_num}, subject='{subject}'")
                             else:
                                 # Handle other unexpected formats
                                 logger.warning(f"Unexpected article format: {article}")
