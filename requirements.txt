@@ -29,3 +29,4 @@ email-validator>=2.2.0
 httpx>=0.28.0
 aiohttp>=3.9.0
 tenacity>=9.0.0
+tmdbsimple>=2.9.0  # TMDB API for movie/TV metadata matching

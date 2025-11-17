@@ -46,6 +46,18 @@ class PreDBService:
                 "method": "",
                 "query_param": "q",
             },
+            {
+                "name": "srrdb.com",
+                "url": "https://www.srrdb.com/api/",
+                "method": "search",
+                "query_param": "q",
+            },
+            {
+                "name": "abgx360.net",
+                "url": "https://abgx360.net/api/",
+                "method": "search",
+                "query_param": "q",
+            },
         ]
 
         # Timeout for API requests
