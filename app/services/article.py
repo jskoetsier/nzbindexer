@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.db.models.group import Group
 from app.db.models.release import Release
 from app.db.session import AsyncSession
+from app.services.deobfuscation import DeobfuscationService
 from app.services.nntp import NNTPService
 
 from sqlalchemy import select
@@ -29,6 +30,7 @@ class ArticleService:
         Initialize the article service
         """
         self.nntp_service = nntp_service or NNTPService()
+        self.deobfuscation_service = DeobfuscationService()
 
     async def process_articles(
         self,
@@ -1058,101 +1060,65 @@ class ArticleService:
                     # Deobfuscate the binary name if it's obfuscated
                     release_name = binary["name"]
                     if binary.get("obfuscated", False) and binary.get("message_ids"):
-                        # Try to get the real filename from yEnc headers
+                        # Try to get the real filename using comprehensive deobfuscation
                         logger.info(
                             f"Attempting to deobfuscate binary: {binary['name']}"
                         )
 
-                        # Helper function to check if a filename is still a hash
-                        def is_filename_hash(filename: str) -> bool:
-                            """Check if a filename (after deobfuscation) is still a hash"""
-                            # Strip extensions and part numbers iteratively
-                            # This handles cases like .part03.rar, .vol001+02.par2, etc.
-                            name_no_ext = filename
-
-                            # Keep stripping extensions until no more matches
-                            while True:
-                                before = name_no_ext
-                                # Strip common extensions
-                                name_no_ext = re.sub(
-                                    r"\.(rar|par2?|zip|7z|nfo|sfv)$",
-                                    "",
-                                    name_no_ext,
-                                    flags=re.IGNORECASE,
-                                )
-                                # Strip .partXX pattern (with or without trailing extension)
-                                name_no_ext = re.sub(
-                                    r"\.part\d+", "", name_no_ext, flags=re.IGNORECASE
-                                )
-                                # Strip .rXX pattern (split rar archives)
-                                name_no_ext = re.sub(
-                                    r"\.r\d+", "", name_no_ext, flags=re.IGNORECASE
-                                )
-                                # Strip .volXX+YY pattern (par2 volumes)
-                                name_no_ext = re.sub(
-                                    r"\.vol\d+\+?\d*",
-                                    "",
-                                    name_no_ext,
-                                    flags=re.IGNORECASE,
-                                )
-                                # If nothing changed, we're done
-                                if name_no_ext == before:
-                                    break
-
-                            # Clean up any remaining dots or dashes at start/end
-                            name_no_ext = name_no_ext.strip(".-_")
-
-                            # Check for hash patterns
-                            return bool(
-                                re.match(
-                                    r"^[a-fA-F0-9]{16,}$", name_no_ext
-                                )  # Hex hash (16+ chars)
-                                or re.match(
-                                    r"^[a-zA-Z0-9]{18,}$", name_no_ext
-                                )  # Alphanumeric only (18+ chars, no dashes/underscores)
-                                or re.match(
-                                    r"^[a-zA-Z0-9_-]{22,}$", name_no_ext
-                                )  # Base64-like with separators (22+ chars)
-                                or (
-                                    len(name_no_ext) < 10
-                                    and not re.search(r"[a-z]{3,}", name_no_ext.lower())
-                                )  # Too short and no real words
-                            )
-
-                        # Try up to 10 message IDs to find a non-hash filename
                         found_real_name = False
                         for message_id in binary["message_ids"][:10]:
+                            # Get yEnc filename first
                             real_filename = await self._get_real_filename_from_yenc(
                                 message_id
                             )
+
                             if real_filename:
-                                # Check if this "deobfuscated" name is still a hash
-                                if is_filename_hash(real_filename):
+                                # Check if deobfuscated filename is still a hash
+                                if self.deobfuscation_service.is_obfuscated_hash(
+                                    real_filename
+                                ):
                                     logger.debug(
-                                        f"yEnc filename is still a hash: {real_filename}, trying RAR header extraction..."
+                                        f"yEnc filename is still obfuscated: {real_filename}"
                                     )
-                                    # Try to extract filename from RAR header
+
+                                    # Try to decode the hash
+                                    decoded = (
+                                        self.deobfuscation_service.try_decode_hash(
+                                            real_filename
+                                        )
+                                    )
+                                    if decoded:
+                                        release_name = decoded
+                                        found_real_name = True
+                                        logger.info(
+                                            f"Successfully decoded hash: {binary['name']} -> {release_name}"
+                                        )
+                                        break
+
+                                    # Try to extract from archive headers
                                     body_lines = (
                                         await self.nntp_service.get_article_body(
                                             message_id
                                         )
                                     )
                                     if body_lines:
-                                        rar_filename = (
-                                            self._extract_filename_from_rar_header(
-                                                body_lines
-                                            )
+                                        extracted = self.deobfuscation_service.extract_filename_from_article(
+                                            body_lines, real_filename
                                         )
-                                        if rar_filename and not is_filename_hash(
-                                            rar_filename
+                                        if (
+                                            extracted
+                                            and not self.deobfuscation_service.is_obfuscated_hash(
+                                                extracted
+                                            )
                                         ):
-                                            release_name = rar_filename
+                                            release_name = extracted
                                             found_real_name = True
                                             logger.info(
-                                                f"Successfully deobfuscated from RAR header: {binary['name']} -> {release_name}"
+                                                f"Successfully extracted from archive: {binary['name']} -> {release_name}"
                                             )
                                             break
-                                    # If RAR extraction failed, try next message ID
+
+                                    # Continue to next message ID
                                     continue
                                 else:
                                     # Found a real filename!
@@ -1164,9 +1130,9 @@ class ArticleService:
                                     break
 
                         if not found_real_name:
-                            # All yEnc attempts yielded hash names - try NFO files
+                            # All methods failed - try NFO files
                             logger.info(
-                                f"All yEnc filenames are hashes, trying NFO extraction for {binary['name']}"
+                                f"Standard deobfuscation failed, trying NFO extraction for {binary['name']}"
                             )
                             nfo_release_name = (
                                 await self._extract_release_name_from_nfo(binary)
@@ -1179,11 +1145,10 @@ class ArticleService:
                                     f"Successfully extracted from NFO: {binary['name']} -> {release_name}"
                                 )
                             else:
-                                # Double-obfuscated with no NFO - skip this release
+                                # Complete deobfuscation failure - skip
                                 logger.warning(
-                                    f"Double-obfuscated post detected: {binary['name']} - all yEnc filenames are hashes and no NFO found. SKIPPING."
+                                    f"Completely obfuscated post detected: {binary['name']} - could not deobfuscate. SKIPPING."
                                 )
-                                # Skip creating this release entirely
                                 continue
 
                     # Check if release already exists
