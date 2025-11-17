@@ -1070,7 +1070,9 @@ class ArticleService:
 
                         # Step 1: Get yEnc filename from first article
                         for message_id in binary["message_ids"][:3]:
-                            yenc_filename = await self._get_real_filename_from_yenc(message_id)
+                            yenc_filename = await self._get_real_filename_from_yenc(
+                                message_id
+                            )
                             if yenc_filename:
                                 logger.debug(f"Found yEnc filename: {yenc_filename}")
                                 break
@@ -1085,7 +1087,11 @@ class ArticleService:
 
                             predb_service = PreDBService(db)
                             try:
-                                predb_result = await predb_service.lookup_obfuscated_name(search_hash)
+                                predb_result = (
+                                    await predb_service.lookup_obfuscated_name(
+                                        search_hash
+                                    )
+                                )
                                 if predb_result:
                                     release_name = predb_result
                                     found_real_name = True
@@ -1098,18 +1104,24 @@ class ArticleService:
                                 await predb_service.close()
 
                         # Step 3: Try NZBHydra2 lookup (if PreDB failed)
-                        if not found_real_name and self.deobfuscation_service.is_obfuscated_hash(search_hash):
+                        if (
+                            not found_real_name
+                            and self.deobfuscation_service.is_obfuscated_hash(
+                                search_hash
+                            )
+                        ):
                             logger.info(f"Trying NZBHydra2 lookup for: {search_hash}")
-                            from app.services.nzbhydra import NZBHydraService
                             from app.core.config import settings
+                            from app.services.nzbhydra import NZBHydraService
 
                             if settings.NZBHYDRA_URL and settings.NZBHYDRA_API_KEY:
                                 hydra_service = NZBHydraService(
-                                    settings.NZBHYDRA_URL,
-                                    settings.NZBHYDRA_API_KEY
+                                    settings.NZBHYDRA_URL, settings.NZBHYDRA_API_KEY
                                 )
                                 try:
-                                    hydra_result = await hydra_service.lookup_hash(search_hash)
+                                    hydra_result = await hydra_service.lookup_hash(
+                                        search_hash
+                                    )
                                     if hydra_result:
                                         release_name = hydra_result
                                         found_real_name = True
@@ -1124,7 +1136,12 @@ class ArticleService:
                                 logger.debug("NZBHydra2 not configured, skipping")
 
                         # Step 4: Try Newznab cross-indexer lookup (if still not found)
-                        if not found_real_name and self.deobfuscation_service.is_obfuscated_hash(search_hash):
+                        if (
+                            not found_real_name
+                            and self.deobfuscation_service.is_obfuscated_hash(
+                                search_hash
+                            )
+                        ):
                             logger.info(f"Trying Newznab lookup for: {search_hash}")
                             # TODO: Configure Newznab indexers in settings
                             # from app.services.newznab import NewznabPool
@@ -1137,7 +1154,9 @@ class ArticleService:
 
                         # Step 4: Try hash decoding (base64, hex, etc.)
                         if not found_real_name and yenc_filename:
-                            decoded = self.deobfuscation_service.try_decode_hash(yenc_filename)
+                            decoded = self.deobfuscation_service.try_decode_hash(
+                                yenc_filename
+                            )
                             if decoded:
                                 release_name = decoded
                                 found_real_name = True
@@ -1146,7 +1165,13 @@ class ArticleService:
                                 )
 
                         # Step 5: Try TMDB metadata matching (if partial info available)
-                        if not found_real_name and yenc_filename and not self.deobfuscation_service.is_obfuscated_hash(yenc_filename):
+                        if (
+                            not found_real_name
+                            and yenc_filename
+                            and not self.deobfuscation_service.is_obfuscated_hash(
+                                yenc_filename
+                            )
+                        ):
                             logger.info(f"Trying TMDB matching for: {yenc_filename}")
                             # TODO: Configure TMDB API key in settings
                             # from app.services.metadata import MetadataService
@@ -1160,12 +1185,19 @@ class ArticleService:
                         # Step 6: Try archive header extraction (requires downloading article)
                         if not found_real_name and yenc_filename:
                             for message_id in binary["message_ids"][:5]:
-                                body_lines = await self.nntp_service.get_article_body(message_id)
+                                body_lines = await self.nntp_service.get_article_body(
+                                    message_id
+                                )
                                 if body_lines:
                                     extracted = self.deobfuscation_service.extract_filename_from_article(
                                         body_lines, yenc_filename
                                     )
-                                    if extracted and not self.deobfuscation_service.is_obfuscated_hash(extracted):
+                                    if (
+                                        extracted
+                                        and not self.deobfuscation_service.is_obfuscated_hash(
+                                            extracted
+                                        )
+                                    ):
                                         release_name = extracted
                                         found_real_name = True
                                         logger.info(
@@ -1178,14 +1210,16 @@ class ArticleService:
                             logger.info(
                                 f"All deobfuscation methods failed, trying NFO extraction for {binary['name']}"
                             )
-                            nfo_release_name = await self._extract_release_name_from_nfo(binary)
+                            nfo_release_name = (
+                                await self._extract_release_name_from_nfo(binary)
+                            )
 
                             if nfo_release_name:
                                 release_name = nfo_release_name
                                 found_real_name = True
                                 logger.info(
                                     f"✓ NFO EXTRACTION SUCCESS: {binary['name']} -> {release_name}"
-                              )
+                                )
 
                         # If nothing worked, keep the obfuscated name and create release anyway
                         # We'll mark it for later deobfuscation attempts
@@ -1195,19 +1229,6 @@ class ArticleService:
                             )
                             # Keep the obfuscated name - we'll create the release below
                             # The release will be searchable by hash once we get the mapping
-
-                            if nfo_release_name:
-                                release_name = nfo_release_name
-                                found_real_name = True
-                                logger.info(
-                                    f"Successfully extracted from NFO: {binary['name']} -> {release_name}"
-                                )
-                            else:
-                                # Complete deobfuscation failure - skip
-                                logger.warning(
-                                    f"Completely obfuscated post detected: {binary['name']} - could not deobfuscate. SKIPPING."
-                                )
-                                continue
 
                     # Check if release already exists
                     from app.services.release import create_release_guid
