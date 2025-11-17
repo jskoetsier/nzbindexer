@@ -616,47 +616,53 @@ class ArticleService:
         try:
             # Look for .nfo files in the binary parts
             nfo_message_ids = []
-            
+
             for part_num, part_info in binary.get("parts", {}).items():
                 subject = part_info.get("subject", "")
                 message_id = part_info.get("message_id", "")
-                
+
                 # Check if this part contains an NFO file
                 if ".nfo" in subject.lower() or "nfo" in subject.lower():
                     nfo_message_ids.append((message_id, subject))
-                    logger.info(f"Found potential NFO file in part {part_num}: {subject}")
-            
+                    logger.info(
+                        f"Found potential NFO file in part {part_num}: {subject}"
+                    )
+
             # Try to download and parse NFO files
             for message_id, subject in nfo_message_ids[:3]:  # Try first 3 NFO files
                 try:
                     # Get yEnc filename first
                     yenc_filename = await self._get_real_filename_from_yenc(message_id)
-                    
+
                     if yenc_filename and ".nfo" in yenc_filename.lower():
                         # Get the article body
-                        body_lines = await self.nntp_service.get_article_body(message_id)
-                        
+                        body_lines = await self.nntp_service.get_article_body(
+                            message_id
+                        )
+
                         if body_lines:
                             # Decode yEnc content
                             nfo_content = self._decode_yenc_body(body_lines)
-                            
+
                             if nfo_content:
                                 # Parse NFO for release name
-                                release_name = self._parse_nfo_for_release_name(nfo_content)
-                                
+                                release_name = self._parse_nfo_for_release_name(
+                                    nfo_content
+                                )
+
                                 if release_name:
                                     logger.info(
                                         f"Successfully extracted release name from NFO: {release_name}"
                                     )
                                     return release_name
-                
+
                 except Exception as e:
                     logger.debug(f"Error processing NFO {message_id}: {str(e)}")
                     continue
-            
+
             logger.debug("No usable NFO files found or could not extract release name")
             return None
-            
+
         except Exception as e:
             logger.warning(f"Error extracting release name from NFO: {str(e)}")
             return None
@@ -669,10 +675,10 @@ class ArticleService:
         try:
             decoded_bytes = bytearray()
             in_yenc_data = False
-            
+
             for line in body_lines:
                 line = line.strip()
-                
+
                 if line.startswith("=ybegin"):
                     in_yenc_data = True
                     continue
@@ -680,25 +686,25 @@ class ArticleService:
                     break
                 elif line.startswith("=ypart"):
                     continue
-                    
+
                 if in_yenc_data and line and not line.startswith("="):
                     # Basic yEnc decoding: subtract 42 from each byte
                     for char in line:
                         byte_val = ord(char)
                         # Handle yEnc escape sequences (=)
-                        if char == '=':
+                        if char == "=":
                             continue
                         decoded_byte = (byte_val - 42) % 256
                         decoded_bytes.append(decoded_byte)
-            
+
             # Try to decode as ASCII/UTF-8
             try:
-                content = decoded_bytes.decode('utf-8', errors='ignore')
+                content = decoded_bytes.decode("utf-8", errors="ignore")
                 return content
             except:
-                content = decoded_bytes.decode('latin-1', errors='ignore')
+                content = decoded_bytes.decode("latin-1", errors="ignore")
                 return content
-                
+
         except Exception as e:
             logger.debug(f"Error decoding yEnc body: {str(e)}")
             return None
@@ -711,16 +717,16 @@ class ArticleService:
         try:
             # Common patterns in NFO files
             patterns = [
-                r'Release[:\s]+(.+)',
-                r'Title[:\s]+(.+)',
-                r'Name[:\s]+(.+)',
-                r'(\S+\.\S+\.\S+\.\S+)',  # Dotted release name pattern
-                r'━+\s*(.+?)\s*━+',  # Text between box drawing characters
-                r'═+\s*(.+?)\s*═+',  # Text between double lines
+                r"Release[:\s]+(.+)",
+                r"Title[:\s]+(.+)",
+                r"Name[:\s]+(.+)",
+                r"(\S+\.\S+\.\S+\.\S+)",  # Dotted release name pattern
+                r"━+\s*(.+?)\s*━+",  # Text between box drawing characters
+                r"═+\s*(.+?)\s*═+",  # Text between double lines
             ]
-            
-            lines = nfo_content.split('\n')
-            
+
+            lines = nfo_content.split("\n")
+
             # Look for release name patterns
             for pattern in patterns:
                 for line in lines[:100]:  # Check first 100 lines
@@ -728,22 +734,26 @@ class ArticleService:
                     match = re.search(pattern, line, re.IGNORECASE)
                     if match:
                         potential_name = match.group(1).strip()
-                        
+
                         # Clean up the name
-                        potential_name = re.sub(r'[^\w\s\.\-\(\)]', '', potential_name)
+                        potential_name = re.sub(r"[^\w\s\.\-\(\)]", "", potential_name)
                         potential_name = potential_name.strip()
-                        
+
                         # Validate it looks like a release name
-                        if (len(potential_name) > 10 and 
-                            len(potential_name) < 200 and
-                            not potential_name.startswith('http') and
-                            '.' in potential_name):
-                            
-                            logger.info(f"Found potential release name in NFO: {potential_name}")
+                        if (
+                            len(potential_name) > 10
+                            and len(potential_name) < 200
+                            and not potential_name.startswith("http")
+                            and "." in potential_name
+                        ):
+
+                            logger.info(
+                                f"Found potential release name in NFO: {potential_name}"
+                            )
                             return potential_name
-            
+
             return None
-            
+
         except Exception as e:
             logger.debug(f"Error parsing NFO content: {str(e)}")
             return None
@@ -847,15 +857,27 @@ class ArticleService:
                         # Helper function to check if a filename is still a hash
                         def is_filename_hash(filename: str) -> bool:
                             """Check if a filename (after deobfuscation) is still a hash"""
-                            # Strip extensions and part numbers
-                            name_no_ext = re.sub(
-                                r'\.(rar|par2?|zip|7z|r\d+|vol\d+|part\d+)$', 
-                                '', 
-                                filename, 
-                                flags=re.IGNORECASE
-                            )
-                            # Also strip .partXX. pattern
-                            name_no_ext = re.sub(r'\.part\d+\.', '.', name_no_ext, flags=re.IGNORECASE)
+                            # Strip extensions and part numbers iteratively
+                            # This handles cases like .part03.rar, .vol001+02.par2, etc.
+                            name_no_ext = filename
+                            
+                            # Keep stripping extensions until no more matches
+                            while True:
+                                before = name_no_ext
+                                # Strip common extensions
+                                name_no_ext = re.sub(r'\.(rar|par2?|zip|7z|nfo|sfv)$', '', name_no_ext, flags=re.IGNORECASE)
+                                # Strip .partXX pattern (with or without trailing extension)
+                                name_no_ext = re.sub(r'\.part\d+', '', name_no_ext, flags=re.IGNORECASE)
+                                # Strip .rXX pattern (split rar archives)
+                                name_no_ext = re.sub(r'\.r\d+', '', name_no_ext, flags=re.IGNORECASE)
+                                # Strip .volXX+YY pattern (par2 volumes)
+                                name_no_ext = re.sub(r'\.vol\d+\+?\d*', '', name_no_ext, flags=re.IGNORECASE)
+                                # If nothing changed, we're done
+                                if name_no_ext == before:
+                                    break
+                            
+                            # Clean up any remaining dots or dashes at start/end
+                            name_no_ext = name_no_ext.strip('.-_')
                             
                             # Check for hash patterns
                             return bool(
@@ -892,8 +914,10 @@ class ArticleService:
                             logger.info(
                                 f"All yEnc filenames are hashes, trying NFO extraction for {binary['name']}"
                             )
-                            nfo_release_name = await self._extract_release_name_from_nfo(binary)
-                            
+                            nfo_release_name = (
+                                await self._extract_release_name_from_nfo(binary)
+                            )
+
                             if nfo_release_name:
                                 release_name = nfo_release_name
                                 found_real_name = True
