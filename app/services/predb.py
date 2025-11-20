@@ -43,20 +43,26 @@ class PreDBService:
             {
                 "name": "predb.me",
                 "url": "https://predb.me/api/v1/",
-                "method": "",
+                "method": "posts",
+                "query_param": "q",
+            },
+            {
+                "name": "predb.pw",
+                "url": "https://predb.pw/api/v1/",
+                "method": "posts",
                 "query_param": "q",
             },
             {
                 "name": "srrdb.com",
-                "url": "https://www.srrdb.com/api/",
-                "method": "search",
+                "url": "https://www.srrdb.com/api/search/",
+                "method": "",
                 "query_param": "q",
             },
             {
-                "name": "abgx360.net",
-                "url": "https://abgx360.net/api/",
-                "method": "search",
-                "query_param": "q",
+                "name": "xrel.to",
+                "url": "https://api.xrel.to/v2/release/",
+                "method": "info",
+                "query_param": "dirname",
             },
         ]
 

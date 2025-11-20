@@ -1057,7 +1057,7 @@ class ArticleService:
                             (len(binary["parts"]) / binary["total_parts"]) * 100.0,
                         )
 
-                    # Deobfuscate the binary name if it's obfuscated
+                        # Deobfuscate the binary name if it's obfuscated
                     release_name = binary["name"]
                     if binary.get("obfuscated", False) and binary.get("message_ids"):
                         # Try to get the real filename using comprehensive deobfuscation
@@ -1080,7 +1080,27 @@ class ArticleService:
                         # If no yEnc filename, use the binary name itself
                         search_hash = yenc_filename or binary["name"]
 
-                        # Step 2: Try PreDB lookup (FIRST - fastest and most reliable)
+                        # Step 1.5: Check ORN cache FIRST (instant lookup, 0ms)
+                        if self.deobfuscation_service.is_obfuscated_hash(search_hash):
+                            from app.db.models.orn_mapping import ORNMapping
+
+                            try:
+                                orn_query = select(ORNMapping).filter(
+                                    ORNMapping.hash == search_hash
+                                )
+                                orn_result = await db.execute(orn_query)
+                                orn_mapping = orn_result.scalars().first()
+
+                                if orn_mapping:
+                                    release_name = orn_mapping.real_name
+                                    found_real_name = True
+                                    logger.info(
+                                        f"✓ ORN CACHE HIT: {binary['name']} -> {release_name} (source: {orn_mapping.source})"
+                                    )
+                            except Exception as e:
+                                logger.debug(f"ORN cache lookup error: {e}")
+
+                        # Step 2: Try PreDB lookup (if ORN cache missed)
                         if self.deobfuscation_service.is_obfuscated_hash(search_hash):
                             logger.info(f"Trying PreDB lookup for: {search_hash}")
                             from app.services.predb import PreDBService
@@ -1098,6 +1118,25 @@ class ArticleService:
                                     logger.info(
                                         f"✓ PreDB SUCCESS: {binary['name']} -> {release_name}"
                                     )
+                                    # Cache this successful mapping
+                                    try:
+                                        from app.db.models.orn_mapping import ORNMapping
+
+                                        orn_mapping = ORNMapping(
+                                            hash=search_hash,
+                                            real_name=release_name,
+                                            source="predb",
+                                        )
+                                        db.add(orn_mapping)
+                                        await db.commit()
+                                        logger.info(
+                                            f"Cached ORN mapping: {search_hash} -> {release_name}"
+                                        )
+                                    except Exception as cache_error:
+                                        logger.debug(
+                                            f"ORN cache save error: {cache_error}"
+                                        )
+                                        await db.rollback()
                             except Exception as e:
                                 logger.warning(f"PreDB lookup error: {e}")
                             finally:
