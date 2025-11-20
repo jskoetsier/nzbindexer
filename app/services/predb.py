@@ -61,7 +61,7 @@ class PreDBService:
         ]
 
         # Timeout for API requests
-        self.timeout = aiohttp.ClientTimeout(total=10)
+        self.timeout = aiohttp.ClientTimeout(total=30)
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session"""

@@ -1183,7 +1183,11 @@ class ArticleService:
                             #     logger.info(f"✓ TMDB SUCCESS: {binary['name']} -> {release_name}")
 
                         # Step 6: Try archive header extraction (requires downloading article)
+                        # Try this for ANY obfuscated filename, not just hashes
                         if not found_real_name and yenc_filename:
+                            logger.info(
+                                f"Attempting archive header extraction for: {yenc_filename}"
+                            )
                             for message_id in binary["message_ids"][:5]:
                                 body_lines = await self.nntp_service.get_article_body(
                                     message_id
