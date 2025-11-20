@@ -1134,6 +1134,54 @@ class ArticleService:
                             except Exception as e:
                                 logger.debug(f"ORN cache lookup error: {e}")
 
+                        # Step 1.6: Try Regex Pattern Matching (instant, 10-50ms)
+                        if not found_real_name:
+                            # Get the original subject from the binary
+                            original_subject = binary_subjects.get(binary_key, "")
+
+                            if original_subject:
+                                logger.info(
+                                    f"Trying regex pattern matching for: {original_subject[:100]}..."
+                                )
+                                from app.services.regex_matcher import RegexMatcher
+
+                                regex_matcher = RegexMatcher(db)
+                                try:
+                                    regex_result = (
+                                        await regex_matcher.match_release_name(
+                                            original_subject, group.name
+                                        )
+                                    )
+                                    if regex_result:
+                                        release_name, pattern_id = regex_result
+                                        found_real_name = True
+                                        logger.info(
+                                            f"✓ REGEX MATCH SUCCESS: {binary['name']} -> {release_name} (pattern: {pattern_id})"
+                                        )
+                                        # Cache this successful mapping
+                                        try:
+                                            from app.db.models.orn_mapping import (
+                                                ORNMapping,
+                                            )
+
+                                            orn_mapping = ORNMapping(
+                                                hash=search_hash,
+                                                real_name=release_name,
+                                                source=f"regex_pattern_{pattern_id}",
+                                            )
+                                            db.add(orn_mapping)
+                                            await db.commit()
+                                            logger.info(
+                                                f"Cached Regex mapping: {search_hash} -> {release_name}"
+                                            )
+                                        except Exception as cache_error:
+                                            logger.debug(
+                                                f"ORN cache save error: {cache_error}"
+                                            )
+                                            await db.rollback()
+                                except Exception as e:
+                                    logger.warning(f"Regex matching error: {e}")
+
                         # Step 1.7: Try RequestID matching (instant, before PreDB)
                         if not found_real_name:
                             # Get the original subject from the binary
