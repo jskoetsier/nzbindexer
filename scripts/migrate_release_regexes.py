@@ -19,40 +19,46 @@ from sqlalchemy import text
 
 async def create_release_regexes_table():
     """Create the release_regexes table"""
-
-    create_table_sql = """
-    CREATE TABLE IF NOT EXISTS release_regexes (
-        id SERIAL PRIMARY KEY,
-        group_pattern VARCHAR(255) NOT NULL,
-        regex TEXT NOT NULL,
-        description VARCHAR(500),
-        ordinal INTEGER NOT NULL DEFAULT 100,
-        active BOOLEAN NOT NULL DEFAULT TRUE,
-        match_count INTEGER NOT NULL DEFAULT 0,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE
-    );
-
-    -- Create indexes for performance
-    CREATE INDEX IF NOT EXISTS idx_release_regexes_group_pattern
-        ON release_regexes(group_pattern);
-
-    CREATE INDEX IF NOT EXISTS idx_release_regexes_ordinal
-        ON release_regexes(ordinal);
-
-    CREATE INDEX IF NOT EXISTS idx_release_regexes_active
-        ON release_regexes(active);
-    """
-
+    
+    # Split SQL into separate statements for asyncpg
+    sql_statements = [
+        """
+        CREATE TABLE IF NOT EXISTS release_regexes (
+            id SERIAL PRIMARY KEY,
+            group_pattern VARCHAR(255) NOT NULL,
+            regex TEXT NOT NULL,
+            description VARCHAR(500),
+            ordinal INTEGER NOT NULL DEFAULT 100,
+            active BOOLEAN NOT NULL DEFAULT TRUE,
+            match_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_release_regexes_group_pattern 
+            ON release_regexes(group_pattern)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_release_regexes_ordinal 
+            ON release_regexes(ordinal)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_release_regexes_active 
+            ON release_regexes(active)
+        """
+    ]
+    
     async with AsyncSessionLocal() as db:
         try:
-            # Execute the SQL
-            await db.execute(text(create_table_sql))
+            # Execute each SQL statement separately
+            for sql in sql_statements:
+                await db.execute(text(sql))
             await db.commit()
-
+            
             print("✓ Successfully created release_regexes table and indexes")
             return True
-
+            
         except Exception as e:
             print(f"✗ Error creating table: {e}")
             await db.rollback()
