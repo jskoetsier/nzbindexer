@@ -469,18 +469,11 @@ class DeobfuscationService:
         Returns:
             Extracted filename or None
         """
-        logger.info(f"[EXTRACT_START] Extracting from: {yenc_filename}")
-        
         # Decode yEnc to get binary data
         decoded_data = self.yenc_decoder.decode(body_lines, max_bytes=10240)
 
         if not decoded_data:
-            logger.info(f"[EXTRACT_FAIL] Failed to decode yEnc data for: {yenc_filename}")
             return None
-
-        logger.info(
-            f"[EXTRACT_DECODED] Decoded {len(decoded_data)} bytes for: {yenc_filename}, first 4 bytes: {decoded_data[:4].hex() if len(decoded_data) >= 4 else 'N/A'}"
-        )
 
         # Try different archive formats based on file extension
         filename_lower = yenc_filename.lower()

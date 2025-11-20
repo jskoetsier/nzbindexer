@@ -1164,25 +1164,7 @@ class ArticleService:
                                     f"✓ HASH DECODE SUCCESS: {binary['name']} -> {release_name}"
                                 )
 
-                        # Step 5: Try TMDB metadata matching (if partial info available)
-                        if (
-                            not found_real_name
-                            and yenc_filename
-                            and not self.deobfuscation_service.is_obfuscated_hash(
-                                yenc_filename
-                            )
-                        ):
-                            logger.info(f"Trying TMDB matching for: {yenc_filename}")
-                            # TODO: Configure TMDB API key in settings
-                            # from app.services.metadata import MetadataService
-                            # metadata_service = MetadataService(tmdb_api_key="YOUR_KEY")
-                            # tmdb_result = await metadata_service.match_release(yenc_filename)
-                            # if tmdb_result:
-                            #     release_name = tmdb_result
-                            #     found_real_name = True
-                            #     logger.info(f"✓ TMDB SUCCESS: {binary['name']} -> {release_name}")
-
-                        # Step 6: Try archive header extraction (requires downloading article)
+                        # Step 5: Try archive header extraction (requires downloading article)
                         # ALWAYS try this if we haven't found a real name yet, even for short/generic filenames
                         # because sometimes the yEnc filename is just the internal archive filename
                         logger.info(
