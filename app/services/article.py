@@ -776,6 +776,40 @@ class ArticleService:
             logger.debug(f"Error extracting RAR filename: {str(e)}")
             return None
 
+    def _extract_request_id(self, subject: str) -> Optional[int]:
+        """
+        Extract request ID from subject line patterns
+
+        Common patterns:
+        - [12345] ...
+        - REQ 12345 ...
+        - 12345-1[ ...
+        - 12345 - ...
+
+        Args:
+            subject: Article subject line
+
+        Returns:
+            Request ID as integer, or None if no match
+        """
+        patterns = [
+            r"^\[\s?(\d{4,6})\s?\]",  # [12345] or [ 12345 ]
+            r"^REQ\s*(\d{4,6})",  # REQ 12345 or REQ12345
+            r"^(\d{4,6})-\d{1}\[",  # 12345-1[
+            r"^(\d{4,6})\s+-",  # 12345 -
+        ]
+
+        for pattern in patterns:
+            match = re.match(pattern, subject, re.IGNORECASE)
+            if match:
+                request_id = int(match.group(1))
+                logger.debug(
+                    f"Extracted RequestID {request_id} from subject: {subject}"
+                )
+                return request_id
+
+        return None
+
     async def _get_real_filename_from_yenc(self, message_id: str) -> Optional[str]:
         """
         Fetch the real filename from yEnc headers for an obfuscated post
@@ -1100,7 +1134,58 @@ class ArticleService:
                             except Exception as e:
                                 logger.debug(f"ORN cache lookup error: {e}")
 
-                        # Step 2: Try PreDB lookup (if ORN cache missed)
+                        # Step 1.7: Try RequestID matching (instant, before PreDB)
+                        if not found_real_name:
+                            # Get the original subject from the binary
+                            original_subject = binary_subjects.get(binary_key, "")
+                            request_id = self._extract_request_id(original_subject)
+
+                            if request_id:
+                                logger.info(
+                                    f"Extracted RequestID {request_id} from subject, checking PreDB..."
+                                )
+                                from app.services.predb import PreDBService
+
+                                predb_service = PreDBService(db)
+                                try:
+                                    requestid_result = (
+                                        await predb_service.lookup_by_request_id(
+                                            request_id, group.name
+                                        )
+                                    )
+                                    if requestid_result:
+                                        release_name = requestid_result
+                                        found_real_name = True
+                                        logger.info(
+                                            f"✓ REQUESTID SUCCESS: {binary['name']} -> {release_name} (RequestID: {request_id})"
+                                        )
+                                        # Cache this successful mapping
+                                        try:
+                                            from app.db.models.orn_mapping import (
+                                                ORNMapping,
+                                            )
+
+                                            orn_mapping = ORNMapping(
+                                                hash=search_hash,
+                                                real_name=release_name,
+                                                source=f"requestid_{request_id}",
+                                            )
+                                            db.add(orn_mapping)
+                                            await db.commit()
+                                            logger.info(
+                                                f"Cached RequestID mapping: {search_hash} -> {release_name}"
+                                            )
+                                        except Exception as cache_error:
+                                            logger.debug(
+                                                f"ORN cache save error: {cache_error}"
+                                            )
+                                            await db.rollback()
+                                except Exception as e:
+                                    logger.warning(f"RequestID lookup error: {e}")
+                                finally:
+                                    await predb_service.close()
+
+                        # Step 2: Try PreDB lookup (if ORN cache and RequestID missed)
                         if self.deobfuscation_service.is_obfuscated_hash(search_hash):
                             logger.info(f"Trying PreDB lookup for: {search_hash}")
                             from app.services.predb import PreDBService

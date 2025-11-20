@@ -259,6 +259,40 @@ class PreDBService:
 
         return None
 
+    async def lookup_by_request_id(
+        self, request_id: int, group_name: str
+    ) -> Optional[str]:
+        """
+        Look up release by RequestID + group name
+
+        Args:
+            request_id: Numeric request ID (e.g., 12345)
+            group_name: Usenet group name
+
+        Returns:
+            Real release name if found, None otherwise
+        """
+        # Create cache key for RequestID lookups
+        cache_key = f"req_{request_id}_{group_name}"
+
+        # Check cache first
+        cached_result = await self.lookup_in_cache(cache_key)
+        if cached_result:
+            logger.info(
+                f"RequestID cache hit: {request_id} in {group_name} -> {cached_result}"
+            )
+            return cached_result
+
+        # Query PreDB APIs with requestid parameter
+        # Note: Most PreDB APIs don't support RequestID lookups via API
+        # This is primarily useful if you have your own PreDB mirror
+        # For now, we'll skip API lookup and rely on cache seeding
+
+        logger.debug(
+            f"No RequestID match found in cache for: {request_id} in {group_name}"
+        )
+        return None
+
     async def lookup_obfuscated_name(self, obfuscated_name: str) -> Optional[str]:
         """
         Full lookup pipeline: cache -> PreDB APIs -> cache result

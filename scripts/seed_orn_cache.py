@@ -25,11 +25,11 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import aiohttp
-from sqlalchemy import select
 
 from app.core.config import settings
 from app.db.models.orn_mapping import ORNMapping
 from app.db.session import AsyncSessionLocal
+from sqlalchemy import select
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -47,9 +47,7 @@ class ORNSeeder:
         self.error_count = 0
 
     async def __aenter__(self):
-        self.session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=30)
-        )
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -59,10 +57,10 @@ class ORNSeeder:
     async def seed_from_predb(self, limit: int = 1000) -> int:
         """
         Seed ORN cache from PreDB APIs (recent releases)
-        
+
         Args:
             limit: Number of recent releases to fetch per API
-            
+
         Returns:
             Number of mappings added
         """
@@ -85,7 +83,7 @@ class ORNSeeder:
             for api in predb_apis:
                 try:
                     logger.info(f"Fetching from {api['name']}...")
-                    
+
                     # Get recent releases
                     url = f"{api['url']}{api['endpoint']}"
                     params = {"limit": min(limit, 100)}  # API limit per request
@@ -108,7 +106,9 @@ class ORNSeeder:
                             if data.get("status") == "success":
                                 releases = data.get("data", [])
 
-                        logger.info(f"Found {len(releases)} releases from {api['name']}")
+                        logger.info(
+                            f"Found {len(releases)} releases from {api['name']}"
+                        )
 
                         # Add to ORN cache
                         for release in releases:
@@ -137,7 +137,7 @@ class ORNSeeder:
     async def seed_from_hydra(self) -> int:
         """
         Seed ORN cache from NZBHydra2 history
-        
+
         Returns:
             Number of mappings added
         """
@@ -157,9 +157,7 @@ class ORNSeeder:
                 url, headers=headers, params=params
             ) as response:
                 if response.status != 200:
-                    logger.error(
-                        f"NZBHydra2 returned status {response.status}"
-                    )
+                    logger.error(f"NZBHydra2 returned status {response.status}")
                     return 0
 
                 data = await response.json()
@@ -198,12 +196,12 @@ class ORNSeeder:
     async def seed_from_csv(self, csv_path: str) -> int:
         """
         Seed ORN cache from CSV file
-        
+
         CSV format: hash,real_name,source (optional)
-        
+
         Args:
             csv_path: Path to CSV file
-            
+
         Returns:
             Number of mappings added
         """
@@ -237,14 +235,16 @@ class ORNSeeder:
 
         return self.added_count
 
-    async def seed_from_newznab(self, indexer_urls: List[str], api_keys: List[str]) -> int:
+    async def seed_from_newznab(
+        self, indexer_urls: List[str], api_keys: List[str]
+    ) -> int:
         """
         Seed ORN cache from Newznab indexers
-        
+
         Args:
             indexer_urls: List of Newznab indexer URLs
             api_keys: Corresponding API keys
-            
+
         Returns:
             Number of mappings added
         """
@@ -265,9 +265,10 @@ class ORNSeeder:
 
                         # Parse XML response (Newznab returns RSS/XML)
                         text = await response.text()
-                        
+
                         # Simple XML parsing for titles
                         import re
+
                         titles = re.findall(r"<title>([^<]+)</title>", text)
 
                         logger.info(f"Found {len(titles)} releases from {url}")
@@ -322,10 +323,10 @@ class ORNSeeder:
     def _generate_hash_candidates(self, release_name: str) -> List[str]:
         """
         Generate potential hash candidates from a release name
-        
+
         For example: "Movie.Name.2024.1080p.BluRay.x264-GROUP"
         Might have been posted as: "a1b2c3d4e5f6.part01.rar"
-        
+
         We can't reverse-engineer the exact hash, but we can create
         variations that might match common obfuscation patterns.
         """
@@ -380,7 +381,10 @@ async def main():
         help="Source to seed from",
     )
     parser.add_argument(
-        "--limit", type=int, default=1000, help="Limit for PreDB/Newznab (default: 1000)"
+        "--limit",
+        type=int,
+        default=1000,
+        help="Limit for PreDB/Newznab (default: 1000)",
     )
     parser.add_argument("--file", help="CSV file path (for csv source)")
     parser.add_argument(
