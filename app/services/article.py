@@ -1185,12 +1185,12 @@ class ArticleService:
                         # Step 6: Try archive header extraction (requires downloading article)
                         # ALWAYS try this if we haven't found a real name yet, even for short/generic filenames
                         # because sometimes the yEnc filename is just the internal archive filename
-                        logger.debug(
-                            f"Archive extraction check: found_real_name={found_real_name}, yenc_filename={yenc_filename}"
+                        logger.info(
+                            f"🔍 Archive extraction check: found_real_name={found_real_name}, yenc_filename={yenc_filename}"
                         )
                         if not found_real_name and yenc_filename:
                             logger.info(
-                                f"Attempting archive header extraction for: {yenc_filename}"
+                                f"📦 Attempting archive header extraction for: {yenc_filename}"
                             )
                             for message_id in binary["message_ids"][:5]:
                                 body_lines = await self.nntp_service.get_article_body(
