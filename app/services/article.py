@@ -1185,6 +1185,9 @@ class ArticleService:
                         # Step 6: Try archive header extraction (requires downloading article)
                         # ALWAYS try this if we haven't found a real name yet, even for short/generic filenames
                         # because sometimes the yEnc filename is just the internal archive filename
+                        logger.debug(
+                            f"Archive extraction check: found_real_name={found_real_name}, yenc_filename={yenc_filename}"
+                        )
                         if not found_real_name and yenc_filename:
                             logger.info(
                                 f"Attempting archive header extraction for: {yenc_filename}"
@@ -1202,8 +1205,7 @@ class ArticleService:
                                         if not self.deobfuscation_service.is_obfuscated_hash(
                                             extracted
                                         ) and (
-                                            len(extracted) > 10
-                                            or "." in extracted
+                                            len(extracted) > 10 or "." in extracted
                                         ):
                                             release_name = extracted
                                             found_real_name = True
