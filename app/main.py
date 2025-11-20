@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
     start_background_tasks()
     yield
     # Shutdown
-    stop_background_tasks()
+    await stop_background_tasks()
 
 
 app = FastAPI(

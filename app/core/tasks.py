@@ -347,21 +347,18 @@ def start_background_tasks() -> None:
     """
     logger.info("Starting background tasks with deobfuscation support")
 
-    # Create event loop
-    loop = asyncio.get_event_loop()
-
-    # Start update task
-    update_task = loop.create_task(update_groups_task())
+    # Create tasks using asyncio.create_task which works with running event loop
+    update_task = asyncio.create_task(update_groups_task())
     running_tasks["update_groups"] = update_task
 
     # Start backfill task
-    backfill_task = loop.create_task(backfill_groups_task())
+    backfill_task = asyncio.create_task(backfill_groups_task())
     running_tasks["backfill_groups"] = backfill_task
 
     logger.info("Background tasks started successfully")
 
 
-def stop_background_tasks() -> None:
+async def stop_background_tasks() -> None:
     """
     Stop all background tasks
     """
@@ -372,6 +369,13 @@ def stop_background_tasks() -> None:
         if not task.done():
             logger.info(f"Cancelling task {name}")
             task.cancel()
+            try:
+                # Wait for task to be cancelled
+                await task
+            except asyncio.CancelledError:
+                logger.info(f"Task {name} cancelled successfully")
+            except Exception as e:
+                logger.error(f"Error cancelling task {name}: {str(e)}")
 
     # Clear running tasks
     running_tasks.clear()
