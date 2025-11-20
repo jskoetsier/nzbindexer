@@ -1183,7 +1183,8 @@ class ArticleService:
                             #     logger.info(f"✓ TMDB SUCCESS: {binary['name']} -> {release_name}")
 
                         # Step 6: Try archive header extraction (requires downloading article)
-                        # Try this for ANY obfuscated filename, not just hashes
+                        # ALWAYS try this if we haven't found a real name yet, even for short/generic filenames
+                        # because sometimes the yEnc filename is just the internal archive filename
                         if not found_real_name and yenc_filename:
                             logger.info(
                                 f"Attempting archive header extraction for: {yenc_filename}"
@@ -1196,18 +1197,24 @@ class ArticleService:
                                     extracted = self.deobfuscation_service.extract_filename_from_article(
                                         body_lines, yenc_filename
                                     )
-                                    if (
-                                        extracted
-                                        and not self.deobfuscation_service.is_obfuscated_hash(
+                                    if extracted:
+                                        # Check if extracted filename is better than what we have
+                                        if not self.deobfuscation_service.is_obfuscated_hash(
                                             extracted
-                                        )
-                                    ):
-                                        release_name = extracted
-                                        found_real_name = True
-                                        logger.info(
-                                            f"✓ ARCHIVE EXTRACTION SUCCESS: {binary['name']} -> {release_name}"
-                                        )
-                                        break
+                                        ) and (
+                                            len(extracted) > 10
+                                            or "." in extracted
+                                        ):
+                                            release_name = extracted
+                                            found_real_name = True
+                                            logger.info(
+                                                f"✓ ARCHIVE EXTRACTION SUCCESS: {binary['name']} -> {release_name}"
+                                            )
+                                            break
+                                        else:
+                                            logger.debug(
+                                                f"Extracted filename is still obfuscated or too short: {extracted}"
+                                            )
 
                         # Step 7: Try NFO extraction (last resort)
                         if not found_real_name:
