@@ -1186,16 +1186,18 @@ class ArticleService:
                         # ALWAYS try this if we haven't found a real name yet, even for short/generic filenames
                         # because sometimes the yEnc filename is just the internal archive filename
                         logger.info(
-                            f"🔍 Archive extraction check: found_real_name={found_real_name}, yenc_filename={yenc_filename}"
+                            f"[ARCHIVE_CHECK] found_real_name={found_real_name}, yenc_filename={yenc_filename}"
                         )
                         if not found_real_name and yenc_filename:
                             try:
                                 logger.info(
-                                    f"📦 Attempting archive header extraction for: {yenc_filename}"
+                                    f"[ARCHIVE_EXTRACT_START] Attempting archive header extraction for: {yenc_filename}"
                                 )
                                 for message_id in binary["message_ids"][:5]:
-                                    body_lines = await self.nntp_service.get_article_body(
-                                        message_id
+                                    body_lines = (
+                                        await self.nntp_service.get_article_body(
+                                            message_id
+                                        )
                                     )
                                     if body_lines:
                                         extracted = self.deobfuscation_service.extract_filename_from_article(
@@ -1211,20 +1213,20 @@ class ArticleService:
                                                 release_name = extracted
                                                 found_real_name = True
                                                 logger.info(
-                                                    f"✓ ARCHIVE EXTRACTION SUCCESS: {binary['name']} -> {release_name}"
+                                                    f"[ARCHIVE_EXTRACT_SUCCESS] {binary['name']} -> {release_name}"
                                                 )
                                                 break
                                             else:
-                                                logger.debug(
-                                                    f"Extracted filename is still obfuscated or too short: {extracted}"
+                                                logger.info(
+                                                    f"[ARCHIVE_EXTRACT_REJECTED] Extracted filename is still obfuscated or too short: {extracted}"
                                                 )
                             except Exception as e:
                                 logger.error(
-                                    f"❌ Exception in archive extraction for {yenc_filename}: {str(e)}"
+                                    f"[ARCHIVE_EXTRACT_ERROR] Exception in archive extraction for {yenc_filename}: {str(e)}"
                                 )
                         else:
                             logger.info(
-                                f"⏭️  Skipping archive extraction: found_real_name={found_real_name}, yenc_filename={yenc_filename}"
+                                f"[ARCHIVE_SKIP] Skipping archive extraction: found_real_name={found_real_name}, yenc_filename={yenc_filename}"
                             )
 
                         # Step 7: Try NFO extraction (last resort)
